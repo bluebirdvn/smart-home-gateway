@@ -51,7 +51,7 @@ jobs:
     - name: build firmware esp32
       uses: espressif/esp-idf-ci-action@v1
       with:
-        esp_idf_version: "release-v5.1"
+        esp_idf_version: "release-v5.5"
         target: "${{ matrix.fw_target }}"
         path: "${{ matrix.fw_path }}"
       
