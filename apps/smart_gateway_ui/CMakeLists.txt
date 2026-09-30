@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.16)
 project(smart_gateway_ui VERSION 0.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+include(GNUInstallDirs)
 
 find_package(Qt6 REQUIRED COMPONENTS Quick Charts Widgets DBus)
 
@@ -20,6 +21,7 @@ install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/config.json"
 
 qt_add_qml_module(smart_gateway_ui
     URI smart_gateway_ui
+    VERSION 1.0
     QML_FILES
         Main.qml
         HomeTab.qml
@@ -69,7 +71,7 @@ target_link_libraries(smart_gateway_ui
     PRIVATE Qt6::DBus
 )
 
-include(GNUInstallDirs)
+
 install(TARGETS smart_gateway_ui
     BUNDLE DESTINATION .
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
