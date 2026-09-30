@@ -399,7 +399,7 @@ static esp_err_t ble_mesh_init(void)
 {
     esp_err_t err = ESP_OK;
 
-    generate(dev_uuid, CLASS_NODE_MESH, 0, HW_VERSION_1_0);
+    generate(dev_uuid, PID_HYBRID_NODE, HW_VERSION_1_0);
 
     esp_ble_mesh_register_prov_callback(example_ble_mesh_provisioning_cb);
     esp_ble_mesh_register_config_server_callback(example_ble_mesh_config_server_cb);

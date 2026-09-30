@@ -7,6 +7,7 @@
 #include "esp_ble_mesh_provisioning_api.h"  
 #include "config.h" 
 #include "mesh_uuid.h"
+#include <iostream>
 // static uint8_t test_net_key[16] = {
 //     0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,
 //     0x08,0x09,0x0A,0x0B,0x0C,0x0D,0x0E,0x0F,
@@ -46,7 +47,7 @@ void Provisioner::init(std::shared_ptr<MeshCommandSender> sender_ptr,
 
     dispatcher->on(OpCode::CMD_ADD_UNPROV_DEV,     [this](const MeshFrame& f) { handle_cmd_add_unprov_dev(f); });
     // dispatcher->on(OpCode::CMD_SET_DEV_UUID_MATCH, [this](const MeshFrame& f) { handle_cmd_set_uuid_match(f); });
-    dispatcher->on(OpCode::CMD_DELETE_NODE,        [this](const MeshFrame& f) { handle_cmd_delete_node(f); });
+    dispatcher->on(OpCode::CMD_DELETE_NODE,        [this](const MeshFrame& f) { std::cout << "delete node %d" << f.addr; });
     dispatcher->on(OpCode::CMD_GROUP_ADD,          [this](const MeshFrame& f) { handle_cmd_group_add(f); });
     dispatcher->on(OpCode::CMD_GROUP_DELETE,       [this](const MeshFrame& f) { handle_cmd_group_delete(f); });
     dispatcher->on(OpCode::CMD_MODEL_PUB_SET,      [this](const MeshFrame& f) { handle_cmd_model_pub_set(f); });
@@ -697,197 +698,7 @@ void Provisioner::ble_mesh_vendor_model_cb(esp_ble_mesh_model_cb_event_t event, 
     }
 }
 
-// void Provisioner::handle_cmd_add_unprov_dev(const MeshFrame& f) {
-//     if (f.payload.size() < sizeof(mesh_cmd_add_unprov_dev_t)) {
-//         return;
-//     }
-//     mesh_cmd_add_unprov_dev_t cmd;
-//     memcpy(&cmd, f.payload.data(), sizeof(cmd));
-//     add_uuid_to_whitelist(cmd.uuid);
-//     ESP_LOGI(TAG, "UUID added to whitelist, will auto-provision on next sighting");
-// }
 
-
-// void Provisioner::handle_cmd_delete_node(const MeshFrame& f) {
-//     esp_ble_mesh_device_delete_t del_dev = {};
-//     del_dev.flag = BIT(0); 
-//     esp_err_t err = esp_ble_mesh_provisioner_delete_dev(&del_dev);
-//     if (err) {
-//         ESP_LOGE(TAG, "Delete node failed %d", err);
-//     }
-// }
-
-// void Provisioner::handle_cmd_group_add(const MeshFrame& f) {
-//     if (!p_config_client) {
-//         return;
-//     }
-//     if (f.payload.size() < sizeof(mesh_cmd_add_dev_to_group_t)) {
-//         return;
-//     }
-//     mesh_cmd_add_dev_to_group_t cmd;
-//     memcpy(&cmd, f.payload.data(), sizeof(cmd));
-
-//     esp_ble_mesh_client_common_param_t  common    = {};
-//     esp_ble_mesh_cfg_client_set_state_t set_state = {};
-//     set_msg_common(&common, f.addr, p_config_client->model, ESP_BLE_MESH_MODEL_OP_MODEL_SUB_ADD);
-//     set_state.model_sub_add.element_addr = cmd.element_addr;
-//     set_state.model_sub_add.sub_addr     = cmd.group_addr;
-//     set_state.model_sub_add.model_id     = cmd.model_id;
-//     set_state.model_sub_add.company_id   = cmd.company_id;
-//     esp_err_t err = esp_ble_mesh_config_client_set_state(&common, &set_state);
-//     if (err) {
-//         ESP_LOGE(TAG, "Model Subscription Add failed %d", err);
-//     }
-// }
-
-// void Provisioner::handle_cmd_group_delete(const MeshFrame& f) {
-//     if (!p_config_client) {
-//         return;
-//     }
-//     if (f.payload.size() < sizeof(mesh_cmd_remove_dev_from_group_t)) {
-//         return;
-//     }
-//     mesh_cmd_remove_dev_from_group_t cmd;
-//     memcpy(&cmd, f.payload.data(), sizeof(cmd));
-
-//     esp_ble_mesh_client_common_param_t  common    = {};
-//     esp_ble_mesh_cfg_client_set_state_t set_state = {};
-//     set_msg_common(&common, f.addr, p_config_client->model, ESP_BLE_MESH_MODEL_OP_MODEL_SUB_DELETE);
-//     set_state.model_sub_delete.element_addr = cmd.element_addr;
-//     set_state.model_sub_delete.sub_addr     = cmd.group_addr;
-//     set_state.model_sub_delete.model_id     = cmd.model_id;
-//     set_state.model_sub_delete.company_id   = cmd.company_id;
-//     esp_err_t err = esp_ble_mesh_config_client_set_state(&common, &set_state);
-//     if (err) {
-//         ESP_LOGE(TAG, "Model Subscription Delete failed %d", err);
-//     }
-// }
-
-// void Provisioner::handle_cmd_model_pub_set(const MeshFrame& f) {
-//     if (!p_config_client) {
-//         return;
-//     }
-//     if (f.payload.size() < sizeof(mesh_cmd_model_pub_set_t)) {
-//         return;
-//     }
-//     mesh_cmd_model_pub_set_t cmd;
-//     memcpy(&cmd, f.payload.data(), sizeof(cmd));
-
-//     esp_ble_mesh_client_common_param_t  common    = {};
-//     esp_ble_mesh_cfg_client_set_state_t set_state = {};
-//     set_msg_common(&common, f.addr, p_config_client->model, ESP_BLE_MESH_MODEL_OP_MODEL_PUB_SET);
-//     set_state.model_pub_set.element_addr        = cmd.element_addr;
-//     set_state.model_pub_set.publish_addr        = cmd.pub_addr;
-//     set_state.model_pub_set.publish_app_idx     = DeviceManager::getInstance().get_prov_key().app_idx;
-//     set_state.model_pub_set.publish_ttl         = cmd.pub_ttl;
-//     set_state.model_pub_set.publish_period      = cmd.pub_period;
-//     set_state.model_pub_set.publish_retransmit  = 0; 
-//     set_state.model_pub_set.model_id            = cmd.model_id;
-//     set_state.model_pub_set.company_id          = cmd.company_id;
-//     esp_err_t err = esp_ble_mesh_config_client_set_state(&common, &set_state);
-
-//     if (err) {
-//         ESP_LOGE(TAG, "Model Publication Set failed %d", err);
-//     }
-
-// }
-
-// void Provisioner::handle_cmd_sensor_get(const MeshFrame& f) {
-//     if (!p_sensor_client) {
-//         return;
-//     }
-//     if (f.payload.size() < sizeof(mesh_cmd_sensor_get_t)) {
-//         return;
-//     }
-//     mesh_cmd_sensor_get_t cmd;
-//     memcpy(&cmd, f.payload.data(), sizeof(cmd));
-//     uint16_t target_addr = f.addr;
-//     send_vendor_msg(target_addr, p_sensor_client->model, VND_OP_SENSOR_GET,
-//                      reinterpret_cast<const uint8_t*>(&cmd), sizeof(cmd));
-// }
-
-
-// void Provisioner::handle_cmd_actuator_set(const MeshFrame& f) {
-
-//     if (f.payload.size() < sizeof(mesh_cmd_actuator_set_t)) {
-//         return;
-//     }
-//     vnd_actuator_set_t cmd;
-//     memcpy(&cmd, f.payload.data(), sizeof(cmd));
-//     int opcode;
-//     esp_ble_mesh_client_t* target_client = nullptr;
-//     if (cmd.device_type == PID_SMART_RELAY) {
-//         target_client = p_relay_client;
-//         opcode = VND_OP_ACTUATOR_RELAY_SET;
-//     } else if (cmd.device_type == PID_SMART_LIGHT) {
-//         target_client = p_light_actuator_client;
-//         opcode = VND_OP_ACTUATOR_LIGHT_SET;
-//     } else if (cmd.device_type == PID_AC_CONTROLLER) {
-//         target_client = p_ac_actuator_client;
-//         opcode = VND_OP_ACTUATOR_AC_SET;
-//     }
-
-//     if (target_client != nullptr) {
-//         uint16_t target_addr = f.addr;
-//         send_vendor_msg(target_addr, target_client->model, opcode,
-//                         reinterpret_cast<const uint8_t*>(&cmd), sizeof(cmd));
-
-//     }
-// }
-
-// void Provisioner::handle_cmd_threshold_config(const MeshFrame& f) {
-
-//     if (f.payload.size() < sizeof(mesh_cmd_threshold_t)) {
-//         return;
-//     }
-//     const mesh_cmd_threshold_t *cmd_mesh = reinterpret_cast<const mesh_cmd_threshold_t*>(f.payload.data());
-
-//     vnd_sensor_threshold_t cmd ={
-//         .src_addr = cmd_mesh->src_addr,
-//         .threshold_on = cmd_mesh->threshold_on,
-//         .threshold_off = cmd_mesh->threshold_off,
-//         .type = cmd_mesh->type
-//     };
-
-//     esp_ble_mesh_client_t* target_client = nullptr;
-//     if (cmd_mesh->actuator_type == PID_SMART_RELAY) {
-//         target_client = p_relay_client;
-//     } else if (cmd_mesh->actuator_type == PID_SMART_LIGHT) {
-//         target_client = p_light_actuator_client;
-//     } else if (cmd_mesh->actuator_type == PID_AC_CONTROLLER) {
-//         target_client = p_ac_actuator_client;
-//     }
-
-//     uint16_t target_addr = f.addr;
-//     send_vendor_msg(target_addr, target_client->model, VND_OP_SENSOR_THRESHOLD_SET,
-//                      reinterpret_cast<const uint8_t*>(&cmd), sizeof(cmd));
-// }
-
-
-// void Provisioner::handle_cmd_set_auto(const MeshFrame& f)
-// {
-
-//     if (f.payload.size() < sizeof(mesh_cmd_set_auto_t)) {
-//         return;
-//     }
-
-//     vnd_actuator_auto_t cmd;
-//     const mesh_cmd_set_auto_t *p = reinterpret_cast<const mesh_cmd_set_auto_t*>(f.payload.data());
-//     cmd.is_auto = p->is_auto;
-//     esp_ble_mesh_client_t* target_client = nullptr;
-
-//     if (p->type == PID_SMART_RELAY) {
-//         target_client = p_relay_client;
-//     } else if (p->type == PID_SMART_LIGHT) {
-//         target_client = p_light_actuator_client;
-//     } else if (p->type == PID_AC_CONTROLLER) {
-//         target_client = p_ac_actuator_client;
-//     }
-//     uint16_t target = f.addr;
-//     send_vendor_msg(target, target_client->model, VND_OP_ACTUATOR_SET_AUTO,
-//                      reinterpret_cast<const uint8_t*>(&cmd), sizeof(cmd));
-
-// }
 
 void Provisioner::handle_cmd_add_unprov_dev(const MeshFrame& f) {
     mesh_cmd_add_unprov_dev_t cmd;

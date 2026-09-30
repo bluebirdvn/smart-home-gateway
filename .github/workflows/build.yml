@@ -32,3 +32,23 @@ jobs:
       run: |
         cd apps
         cmake --build build -j4
+
+  build firmware:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        fw_path:
+          - "firmware/esp32-mesh/node_ble_mesh_actuator_ac_r"
+          - "firmware/esp32-mesh/provisioner"
+          - "firmware/esp32-mesh/rpr_server"
+    steps:
+    - name: checkout repo
+      uses: actions/checkout@v4
+
+    - name: build firmware esp32
+      uses: espressif/esp-idf-ci-action@v1
+      with:
+        esp_idf_version: "release-v5.1"
+        target: "esp32"
+        path: "${{ matrix.fw_path }}"
+      

@@ -8,6 +8,7 @@ SRC_URI = "file://screen_overlayer.dts \
 DEPENDS += "dtc-native virtual/kernel"
 S = "${WORKDIR}"
 DEPENDS += "dtc-native"
+inherit deploy
 do_compile() {
     cpp -nostdinc -undef -x assembler-with-cpp \
         -I${STAGING_KERNEL_DIR}/include \
@@ -23,5 +24,12 @@ do_install() {
     
     install -m 0644 ${WORKDIR}/screen_overlayer.dtbo ${D}/boot/overlays/screen-overlayer.dtbo
 }
+
+do_deploy() {
+    install -d ${DEPLOYDIR}
+    install -m 0644 ${WORKDIR}/screen_overlayer.dtbo ${DEPLOYDIR}/screen-overlayer.dtbo
+}
+
+addtask deploy after do_install before do_build
 
 FILES:${PN} += "/boot/overlays/screen-overlayer.dtbo"
