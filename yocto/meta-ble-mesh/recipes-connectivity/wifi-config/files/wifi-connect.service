@@ -1,0 +1,12 @@
+[Unit]
+Description=WiFi Connection Helper
+After=wpa_supplicant@wlan0.service
+Wants=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/wifi-connect.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

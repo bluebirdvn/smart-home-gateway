@@ -1,0 +1,10 @@
+#ifndef COMMUNICATION_STATUS_HPP
+#define COMMUNICATION_STATUS_HPP
+
+typedef enum {
+    COMMUNICATION_SUCCESS = 0,
+    COMMUNICATION_FAILED,
+    COMMUNICATION_ERROR
+} communication_status_t;
+
+#endif

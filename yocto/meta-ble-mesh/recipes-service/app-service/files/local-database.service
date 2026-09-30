@@ -1,0 +1,18 @@
+[Unit]
+Description=Local SQLite Database Service
+Requires=dbus.service
+After=dbus.service local-fs.target
+
+[Service]
+Type=simple
+Environment=GATEWAY_CONFIG_PATH=/etc/gateway/config.json
+Environment=LOCAL_DATABASE_PATH=/var/lib/gateway/mesh_database.db
+Environment=LOCAL_DATABASE_SQL_PATH=/etc/gateway/local_db_mesh_ble.sql
+Environment=LOCAL_DATABASE_XML_PATH=/etc/gateway/db.xml
+ExecStart=/usr/bin/local-database
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+

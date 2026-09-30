@@ -1,0 +1,14 @@
+{
+  "host": "2b14d65896224e8791c73c1ec3744c34.s1.eu.hivemq.cloud",
+  "port": 8883,
+  "client_id": "gateway_daemon_mqtt_001",
+  "username": "gateway_ble",
+  "password": "gateway_ble",
+  "clean_session": true,
+  "keep_alive": 30,
+  "use_tls": true,
+  "ca_file": "0",
+  "cert_file": "0",
+  "key_file": "0",
+  "verify_server": false
+}

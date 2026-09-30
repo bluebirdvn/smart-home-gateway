@@ -1,0 +1,24 @@
+{
+    "Mesh": {
+        "serviceName": "com.gateway.mesh",
+        "objectPath": "/com/gateway/mesh",
+        "interfaceName": "com.gateway.mesh.events"
+    },
+    "Mqtt": {
+        "serviceName": "com.gateway.mqtt",
+        "objectPath": "/com/gateway/mqtt",
+        "interfaceName": "com.gateway.mqtt.events"
+    },
+
+    "UI": {
+        "serviceName": "com.gateway.ui",
+        "objectPath": "/com/gateway/ui",
+        "interfaceName": "com.gateway.ui.events"
+    },
+    "Db": {
+        "serviceName": "com.gateway.db",
+        "objectPath": "/com/gateway/db",
+        "interfaceName": "com.gateway.db.events"
+    }
+    
+}

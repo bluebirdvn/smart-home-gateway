@@ -1,0 +1,17 @@
+ctrl_interface=/var/run/wpa_supplicant
+ctrl_interface_group=0
+update_config=1
+country=VN
+ap_scan=1
+fast_reauth=1
+
+network={
+	ssid="Tang 3"
+	psk="66668888"
+    key_mgmt=WPA-PSK
+    scan_ssid=1
+    priority=10
+    proto=RSN WPA
+    pairwise=CCMP TKIP
+    group=CCMP TKIP
+}

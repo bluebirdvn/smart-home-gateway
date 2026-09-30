@@ -1,0 +1,31 @@
+<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN"
+ "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
+<node name="/com/gateway/ui">
+    <interface name="com.gateway.mesh.events">
+        <signal name="GroupStatus">
+            <arg name="payload" type="s"/>
+        </signal>
+        <signal name="SensorDataStatus">
+            <arg name="payload" type="s"/>
+        </signal>
+        <signal name="GatewayStatus">
+            <arg name="payload" type="s"/>
+        </signal>
+        <signal name="NodeInfo">
+            <arg name="payload" type="s"/>
+        </signal>
+        <signal name="UnprovDeviceEvent">
+            <arg name="payload" type="s"/>
+        </signal>
+        <signal name="MeshStatus">
+            <arg name="payload" type="s"/>
+        </signal>
+        <signal name="ActuatorStatus">
+            <arg name="payload" type="s"/>
+        </signal>
+        <signal name="HeartbeatEvent">
+            <arg name="payload" type="s"/>
+        </signal>
+    </interface>
+</node>
+

@@ -1,0 +1,37 @@
+<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN"
+ "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
+<node name="/com/gateway/mqtt"> 
+    <interface name="com.gateway.mqtt.events">
+        <signal name="SendActuatorCmd">
+            <arg name="payload" type="s"/>
+        </signal>
+        <signal name="DeleteNodeCmd">
+            <arg name="payload" type="s"/>
+        </signal>
+        <signal name="UuidWhitelistCmd">
+            <arg name="payload" type="s"/>
+        </signal>
+        <signal name="GroupSubscribeCmd">
+            <arg name="payload" type="s"/>
+        </signal>
+        <signal name="GroupUnsubscribeCmd">
+            <arg name="payload" type="s"/>
+        </signal>
+        <signal name="GroupPublishAddCmd">
+            <arg name="payload" type="s"/>
+        </signal>
+        <signal name="GroupPublishRemoveCmd">
+            <arg name="payload" type="s"/>
+        </signal>
+        <signal name="ThresholdConfigCmd">
+            <arg name="payload" type="s"/>
+        </signal>
+        <signal name="ServerStatus">
+            <arg name="payload" type="s"/>
+        </signal>
+
+        <signal name="UpdateGroupCmd">
+            <arg name="payload" type="s"/>
+        </signal>
+    </interface>
+</node>

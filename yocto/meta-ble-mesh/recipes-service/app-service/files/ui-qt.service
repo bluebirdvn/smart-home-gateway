@@ -1,0 +1,19 @@
+[Unit]
+Description=UI App using QT platform
+Requires=daemon-uart.service local-database.service
+After=daemon-uart.service local-database.service
+PartOf=local-database.service
+
+[Service]
+Type=simple
+Environment=GATEWAY_CONFIG_PATH=/etc/gateway/config.json
+Environment=QT_QPA_PLATFORM=linuxfb:fb=/dev/fb1
+Environment=QT_QUICK_BACKEND=software
+Environment=QSG_RHI_BACKEND=software
+Environment=QT_QPA_GENERIC_PLUGINS=evdevtouch:/dev/input/event0
+ExecStart=/usr/bin/smart_gateway_ui
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,20 @@
+[Unit]
+Description=Mqtt app for connecting to server through hivemqtt broker
+Requires=daemon-uart.service local-database.service network-online.target
+After=daemon-uart.service local-database.service network-online.target
+PartOf=local-database.service
+
+[Service]
+Type=simple
+Environment=GATEWAY_CONFIG_PATH=/etc/gateway/config.json
+Environment=GATEWAY_MQTT_CONFIG_PATH=/etc/gateway/mqtt_config.json
+Environment=GATEWAY_MQTT_XML_PATH=/etc/gateway/mqtt.xml
+
+ExecStart=/usr/bin/mqtt-connect
+Restart=always
+RestartSec=3
+
+
+[Install]
+WantedBy=multi-user.target
+
