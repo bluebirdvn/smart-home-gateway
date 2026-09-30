@@ -7,7 +7,7 @@ include(GNUInstallDirs)
 
 find_package(Qt6 REQUIRED COMPONENTS Quick Charts Widgets DBus)
 
-qt_standard_project_setup(REQUIRES 6.5)
+qt_standard_project_setup(REQUIRES 6.8)
 
 qt_add_executable(smart_gateway_ui
     main.cpp
