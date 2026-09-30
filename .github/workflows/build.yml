@@ -1,0 +1,30 @@
+name: Check C++ Build
+
+on: 
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  build-apps:
+    runs-on: ubuntu-lastest
+
+    steps:
+    - name: download source code 
+      uses: actions/checkout@v3
+    - name: install libs
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake build-essential
+        sudo apt-get install -y libsqlite3-dev libdbus-1-dev libglib2.0-dev
+        sudo apt-get install -y qt6-base-dev qt6-declarative-dev libqt6charts6-dev
+        sudo apt-get install -y libpaho-mqtt-dev
+    - name: configure cmake
+      run: |
+        cd apps
+        cmake -B build -S .
+    - name: compile
+      run: |
+        cd apps
+        cmake --build build -j4
