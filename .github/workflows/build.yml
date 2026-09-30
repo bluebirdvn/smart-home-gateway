@@ -33,7 +33,7 @@ jobs:
         cd apps
         cmake --build build -j4
 
-  build firmware:
+  build-firmwares:
     runs-on: ubuntu-latest
     strategy:
       matrix:
