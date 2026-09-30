@@ -177,12 +177,13 @@ struct mesh_cmd_actuator_set_t {
     uint8_t device_type;
     uint8_t setpoint;
     uint8_t onoff;
-
+    uint8_t status;
     bool decode(const std::vector<uint8_t>& p) {
         PayloadReader r(p);
         device_type = r.u8();
         setpoint    = r.u8();
         onoff       = r.u8();
+        status      = r.u8();
         return r.ok();
     }
 };
