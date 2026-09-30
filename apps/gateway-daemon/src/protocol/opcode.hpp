@@ -283,7 +283,7 @@ static_assert(sizeof(mesh_cmd_remove_dev_from_group_t) == 8, "mesh_cmd_remove_de
 static_assert(sizeof(mesh_cmd_model_pub_set_t)       == 10, "mesh_cmd_model_pub_set_t size");
 static_assert(sizeof(mesh_cmd_sensor_get_t)          == 2,  "mesh_cmd_sensor_get_t size");
 static_assert(sizeof(mesh_evt_sensor_status_t)       == 7,  "mesh_evt_sensor_status_t size");
-static_assert(sizeof(mesh_cmd_actuator_set_t)        == 3,  "mesh_cmd_actuator_set_t size");
+static_assert(sizeof(mesh_cmd_actuator_set_t)        == 4,  "mesh_cmd_actuator_set_t size");
 static_assert(sizeof(mesh_evt_actuator_status_t)     == 4,  "mesh_evt_actuator_status_t size");
 static_assert(sizeof(mesh_evt_unprov_adv_t)          == 20, "mesh_evt_unprov_adv_t size");
 static_assert(sizeof(mesh_evt_prov_complete_t)       == 25, "mesh_evt_prov_complete_t size");
