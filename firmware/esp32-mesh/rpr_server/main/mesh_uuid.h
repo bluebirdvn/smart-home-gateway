@@ -4,7 +4,6 @@
 #include <cstring>
 #include "esp_mac.h"
 #include "esp_log.h"
-#include "vendor_model.h"
 
 #define COMPANY_ID      CID_ESP
 
