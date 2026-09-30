@@ -20,7 +20,7 @@ install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/config.json"
 )
 
 qt_add_qml_module(smart_gateway_ui
-    URI smart_gateway_ui
+    URI SmartGatewayUI
     VERSION 1.0
     QML_FILES
         Main.qml
