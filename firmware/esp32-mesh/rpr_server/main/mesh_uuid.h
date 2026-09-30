@@ -5,7 +5,7 @@
 #include "esp_mac.h"
 #include "esp_log.h"
 
-#define COMPANY_ID      CID_ESP
+#define COMPANY_ID      0x02E5
 
 #define PID_SMART_RELAY       0x01  
 #define PID_SMART_LIGHT       0x02  
