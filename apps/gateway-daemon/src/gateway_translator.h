@@ -79,7 +79,7 @@ public:
                 auto dto = ipc_to_dto<ModeAutoDto>(msg);
                 uint16_t target_addr = dto.element_addr != 0 ? static_cast<uint16_t>(dto.element_addr) : ::unicast_from_node_id(dto.node_id);
                 if (target_addr == 0) throw std::invalid_argument("invalid target_addr");
-                sender.actuator_set_auto(target_addr, dto.actuator_type, dto.onoff, dto.is_auto);
+                sender.actuator_set_auto(target_addr, dto.actuator_type, dto.is_auto);
             } catch (...) {}
         };
     }
@@ -90,7 +90,7 @@ public:
                 auto dto = ipc_to_dto<ActuatorCmdDto>(msg);                
                 uint16_t target_addr = dto.element_addr != 0 ? static_cast<uint16_t>(dto.element_addr) : ::unicast_from_node_id(dto.node_id);
                 if (target_addr == 0) throw std::invalid_argument("Invalid target_addr");
-                sender.actuator_set(target_addr, dto.device_type, dto.setpoint, dto.status);
+                sender.actuator_set(target_addr, dto.device_type, dto.setpoint, dto.onoff, dto.status);
             } catch (...) {}
         };
     }
