@@ -60,7 +60,7 @@ void Provisioning::onProvComplete(const MeshFrame& f)
         dev.net_idx = p->net_idx;
         dev.unicast = f.addr;
         dev.element_num  = p->elem_num;
-        dev.uuid.assign(reinterpret_cast<const char*>(p->uuid), 16);
+        dev.uuid = uuid_hex;
         dev.element_addr = p->element_addr;
         dev.model_id     = p->model_id;
         dev.company_id   = p->company_id;

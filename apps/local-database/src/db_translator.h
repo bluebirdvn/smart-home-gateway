@@ -117,6 +117,37 @@ namespace sync_json {
             return o.str();
         }) + "}";
     }
+
+    inline std::string sensor_one(const SensorReading& s) {
+        std::ostringstream o;
+        o << "{\"node_id\":\"" << jutil::esc(s.node_id) 
+        << "\",\"temperature\":" << s.temperature
+          << ",\"humidity\":" << s.humidity
+          << ",\"soil_moisture\":" << s.soil_moisture
+          << ",\"lux\":" << s.lux 
+          << ",\"motion\":" << s.motion
+          << ",\"battery\":" << s.battery << ",\"status\":1}";
+        return o.str();
+    }
+
+    static std::string display_name(const Node& n) {
+        if (!n.name.empty() && n.name.find("node_") != 0 && n.name != "unknown") {
+            return n.name;
+        }
+
+        char suffix[16];
+        std::snprintf(suffix, sizeof(suffix), " %04X", n.element_addr);
+        std::string suf_str(suffix);
+
+        switch (n.model_id) {
+            case VND_MODEL_ID_SENSOR:         return "Sensor" + suf_str;
+            case VND_MODEL_ID_ACTUATOR:       return "Actuator" + suf_str;
+            case VND_MODEL_ID_ACTUATOR_AC:    return "Air Conditioner" + suf_str;
+            case VND_MODEL_ID_ACTUATOR_LIGHT: return "Light" + suf_str;
+            case VND_MODEL_ID_ACTUATOR_RELAY: return "Relay" + suf_str;
+            default:                          return n.node_id;
+        }
+    }
 }
 
 class DbTranslator {
@@ -131,7 +162,7 @@ public:
                     std::ostringstream o;
                     o << "{"
                       << "\"node_id\":\"" << jutil::esc(n.node_id) << "\","
-                      << "\"name\":\"" << (n.name.empty() ? jutil::esc(n.node_id) : jutil::esc(n.name)) << "\","
+                      << "\"name\":\"" << jutil::esc(sync_json::display_name(n)) << "\","
                       << "\"uuid\":\"" << jutil::esc(n.uuid) << "\","
                       << "\"unicast\":" << n.unicast << ","
                       << "\"element_addr\":" << n.element_addr << ","
@@ -223,7 +254,7 @@ public:
                 repos->sensor->insert(s);
                 
                 if (ipc) {
-                    ipc->publish("SensorSyncEvent", IpcMessage{sync_json::sensor_sync(repos)});
+                    ipc->publish("SensorSyncEvent", IpcMessage{sync_json::sensor_one(s)});
                 }
             } catch (const std::exception& e) {
                 std::cerr << "SensorData error: " << e.what() << "\n";
@@ -310,7 +341,9 @@ public:
                     a.is_auto = dto.is_auto ? 1 : 0;
                     repos->actuator->upsert(a);
                 }
-            } catch (...) {}
+            } catch (const std::exception& e) { 
+                std::cerr << "parse UI: " << e.what() << "\n"; 
+            }
             forward(ipc, "MeshCmdAutoMode", msg.payload);
         };
     }
@@ -331,7 +364,9 @@ public:
                     a.threshold_type = dto.threshold_type;
                     repos->actuator->upsert(a);
                 }
-            } catch (...) {}
+            } catch (const std::exception& e) { 
+                std::cerr << "parse UI: " << e.what() << "\n"; 
+            }
             forward(ipc, "MeshCmdThresholdConfig", msg.payload);
         };
     }
@@ -345,7 +380,9 @@ public:
                 if (ipc) {
                     make_ui_sync_all_nodes_handler(repos, ipc)(IpcMessage{});
                 }
-            } catch (...) {}
+            } catch (const std::exception& e) { 
+                std::cerr << "parse UI: " << e.what() << "\n"; 
+            }
             forward(ipc, "MeshCmdDeleteNode", msg.payload);
         };
     }
@@ -356,7 +393,9 @@ public:
                 return;
             }
             make_ui_sync_all_nodes_handler(repos, ipc)(IpcMessage{});
-            ipc->publish("SensorSyncEvent", IpcMessage{sync_json::sensor_sync(repos)});
+            for (const auto& s : repos->sensor->findLatest()) {
+                ipc->publish("SensorSyncEvent", IpcMessage{sync_json::sensor_one(s)});
+            }
         };
     }
 
@@ -481,12 +520,19 @@ public:
                             member.group_id = dto.groupId; 
                             member.node_id = idbuf; 
                             member.role = "actuator"; 
-                            member.mesh_applied = 0; // Chờ Mesh báo về mới update lên 1
+                            member.mesh_applied = 0; 
                             if (old_members.count(idbuf) && old_members[idbuf].role == "actuator" && old_members[idbuf].mesh_applied == 1) {
                                 member.mesh_applied = 1;
                             }
                             repos->group_member->upsert(member);
                             old_members.erase(idbuf);
+
+                            ModeAutoDto m;
+                            m.node_id = idbuf;
+                            m.element_addr = optNode->element_addr;
+                            m.actuator_type = a_type;
+                            m.is_auto = dto.isAutoMode;
+                            ipc->publish("MeshCmdAutoMode", IpcMessage{m.to_json()});
 
                         }
                     }
@@ -496,11 +542,18 @@ public:
                     if (ipc) {
                         if (auto optNode = repos->node->findById(node_id_str)) {
                             GroupDeleteDto delDto;
-                            delDto.node_id = optNode->node_id; delDto.element_addr = optNode->element_addr;
-                            delDto.group_addr = dto.meshGroupAddr; delDto.model_id = optNode->model_id; delDto.company_id = optNode->company_id;
+                            delDto.node_id = optNode->node_id;
+                            delDto.element_addr = optNode->element_addr;
+                            delDto.group_addr = dto.meshGroupAddr;
+                            delDto.model_id = optNode->model_id;
+                            delDto.company_id = optNode->company_id;
                             
-                            if (old_m.role == "sensor") ipc->publish("GroupPublishRemoveCmd", IpcMessage{delDto.to_json()});
-                            else if (old_m.role == "actuator") ipc->publish("GroupUnsubscribeCmd", IpcMessage{delDto.to_json()});
+                            if (old_m.role == "sensor") {
+                                ipc->publish("GroupPublishRemoveCmd", IpcMessage{delDto.to_json()});
+                            }
+                            else if (old_m.role == "actuator") {
+                                ipc->publish("GroupUnsubscribeCmd", IpcMessage{delDto.to_json()});
+                            }
                         }
                     }
                 }
@@ -524,8 +577,11 @@ public:
                     for (const auto& m : existing_members) {
                         if (auto n = repos->node->findById(m.node_id)) {
                             GroupDeleteDto delDto;
-                            delDto.node_id = n->node_id; delDto.element_addr = n->element_addr;
-                            delDto.group_addr = group_info->group_addr; delDto.model_id = n->model_id; delDto.company_id = n->company_id;
+                            delDto.node_id = n->node_id;
+                            delDto.element_addr = n->element_addr;
+                            delDto.group_addr = group_info->group_addr;
+                            delDto.model_id = n->model_id;
+                            delDto.company_id = n->company_id;
                             
                             if (ipc) {
                                 if (m.role == "sensor") {
@@ -580,7 +636,7 @@ public:
                     n = *cur;
                 } else {
                     n.node_id = node_id_str;
-                    n.name = node_id_str; 
+                    
                     if (dto.model_id == VND_MODEL_ID_SENSOR) { 
                         n.kind = "sensor";
                     } else if (dto.model_id == VND_MODEL_ID_ACTUATOR) {
@@ -595,7 +651,28 @@ public:
                         n.kind = "unknown";
                     }
                 }
-                
+
+                if (dto.model_id == VND_MODEL_ID_SENSOR) {
+                    n.kind = "sensor";
+                    if (n.name.empty() || n.name.find("node_")) {
+                        n.name = "sensor";
+                    }
+                } else if (dto.model_id == VND_MODEL_ID_ACTUATOR_AC) {
+                    n.kind = "air conditioner";
+                    n.name = "Air Conditioner"; 
+                } else if (dto.model_id == VND_MODEL_ID_ACTUATOR_LIGHT) {
+                    n.kind = "light";
+                    n.name = "light"; 
+                } else if (dto.model_id == VND_MODEL_ID_ACTUATOR_RELAY) {
+                    n.kind = "relay";
+                    n.name = "relay"; 
+                } else if (dto.model_id == VND_MODEL_ID_ACTUATOR) {
+                    if (n.kind == "unknown") n.kind = "actuator";
+                    if (n.name.empty() || n.name == "unknown" || n.name.find("node_")) {
+                        n.name = "actuator";
+                    }
+                }
+
                 n.uuid = uuid_str;
                 n.unicast = dto.unicast; 
                 n.element_addr = dto.element_addr;

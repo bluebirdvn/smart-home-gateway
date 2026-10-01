@@ -3,6 +3,7 @@
 
 #include "sdkconfig.h"
 #include "driver/gpio.h"
+
 #if CONFIG_IDF_TARGET_ESP32
     #define BOARD_NAME "ESP32"
 
@@ -27,8 +28,8 @@
     #define BOARD_NAME "ESP32-C6"
 
     #define UART_PORT_NUM  UART_NUM_1
-    #define TX_UART_NUM    GPIO_NUM_17
-    #define RX_UART_NUM    GPIO_NUM_16
+    #define TX_UART_NUM    GPIO_NUM_4
+    #define RX_UART_NUM    GPIO_NUM_5
 
     #define I2C_SDA_PIN    GPIO_NUM_6
     #define I2C_SCL_PIN    GPIO_NUM_7
@@ -37,8 +38,8 @@
     #define BOARD_NAME "ESP32-H2"
 
     #define UART_PORT_NUM  UART_NUM_1
-    #define TX_UART_NUM    GPIO_NUM_24
-    #define RX_UART_NUM    GPIO_NUM_23
+    #define TX_UART_NUM    GPIO_NUM_4
+    #define RX_UART_NUM    GPIO_NUM_5
 
     #define I2C_SDA_PIN    GPIO_NUM_6
     #define I2C_SCL_PIN    GPIO_NUM_7

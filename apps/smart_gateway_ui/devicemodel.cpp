@@ -165,7 +165,7 @@ QHash<int, QByteArray> DeviceModel::roleNames() const {
         {ModelIdRole, "devModelId"},
         {CompanyIdRole, "devCompanyId"},
         {IsLightRole, "devIsLight"},
-        {IsAcRole, "DevIsAc"}
+        {IsAcRole, "devIsAc"}
     };
 }
 
@@ -198,11 +198,11 @@ void DeviceModel::markOffline(const QString& nodeId) {
 void DeviceModel::updateSensorData(const QString& nodeId, float temp, float humi, float soil, float lux, float motion, int battery, quint64 lastSeen) {
     for (int i = 0; i < devices.count(); ++i) {
         if (devices[i].nodeId == nodeId && devices[i].kind == NodeKind::Sensor) {
-            devices[i].data.sensor = { humi, temp, soil, lux, motion, battery }; 
+            devices[i].data.sensor = { humi, temp, lux, soil, motion, battery }; 
             devices[i].lastSeen = lastSeen;
             devices[i].status = 1;
             calculateAverages();
-            emit dataChanged(index(i), index(i), {TemperatureRole, HumidityRole, SoilMoistureRole, LuxRole, MotionRole, BatteryRole, StatusRole});
+            emit dataChanged(index(i), index(i), {TemperatureRole, HumidityRole, LuxRole, SoilMoistureRole, MotionRole, BatteryRole, StatusRole});
             emit deviceCountChanged();
             return;
         }

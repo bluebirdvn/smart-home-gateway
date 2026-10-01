@@ -711,6 +711,7 @@ void Provisioner::handle_cmd_add_unprov_dev(const MeshFrame& f) {
 }
 
 void Provisioner::handle_cmd_group_add(const MeshFrame& f) {
+    ESP_LOGI(TAG, "Received CMD_GROUP_ADD for addr 0x%04x", f.addr);
     if (!p_config_client) return;
 
     mesh_cmd_add_dev_to_group_t cmd;
@@ -728,7 +729,9 @@ void Provisioner::handle_cmd_group_add(const MeshFrame& f) {
     set_state.model_sub_add.company_id   = cmd.company_id;
     
     esp_err_t err = esp_ble_mesh_config_client_set_state(&common, &set_state);
-    if (err) ESP_LOGE(TAG, "Model Subscription Add failed %d", err);
+    if (err) {
+        ESP_LOGE(TAG, "Model Subscription Add failed %d", err);
+    }
 }
 
 void Provisioner::handle_cmd_group_delete(const MeshFrame& f) {

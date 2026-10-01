@@ -5,6 +5,10 @@
 #include <stdlib.h>
 #include <vector>
 
+/**
+ * @brief read
+ * 
+ */
 class PayloadReader {
     const std::vector<uint8_t>& buf;
     size_t off = 0;
@@ -24,7 +28,7 @@ class PayloadReader {
     bool ok() const { 
         return ok_; 
     }
-    
+
     size_t remaining() const { 
         return buf.size() - off; 
     }

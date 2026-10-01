@@ -28,9 +28,21 @@ namespace {
 
     inline uint16_t unicast_from_node_id(const std::string& node_id) {
         if (node_id.rfind("node_", 0) == 0 && node_id.size() > 5) {
-            try { return static_cast<uint16_t>(std::stoul(node_id.substr(5), nullptr, 16)); } catch (...) {}
+            try { 
+                return static_cast<uint16_t>(std::stoul(node_id.substr(5), nullptr, 16)); 
+            } catch (const std::exception& e) {
+                std::cerr << "[GatewayTranslator] ERROR: " << e.what() << "\n";
+            } catch (...) {
+                std::cerr << "[GatewayTranslator] UNKNOWN ERROR!\n";
+            }
         }
-        try { return static_cast<uint16_t>(std::stoul(node_id)); } catch (...) {}
+        try { 
+            return static_cast<uint16_t>(std::stoul(node_id)); 
+        } catch (const std::exception& e) {
+            std::cerr << "[GatewayTranslator] ERROR: " << e.what() << "\n";
+        } catch (...) {
+            std::cerr << "[GatewayTranslator] UNKNOWN ERROR!\n";
+        }
         return 0;
     }
 } 
@@ -57,7 +69,11 @@ public:
                 uint8_t match[16] = {0};
                 hex_to_bytes(dto.uuid, match, 16);
                 sender.add_unprov_dev(match, dto.bearer);
-            } catch (...) {}
+            } catch (const std::exception& e) {
+                std::cerr << "[GatewayTranslator] ERROR: " << e.what() << "\n";
+            } catch (...) {
+                std::cerr << "[GatewayTranslator] UNKNOWN ERROR!\n";
+            }
         };
     }
 
@@ -69,7 +85,11 @@ public:
                 if (uni == 0) throw std::invalid_argument("Invalid node_id");
                 sender.delete_node(uni);
                 { std::lock_guard<std::mutex> lk(known_uuids_mutex); }
-            } catch (...) {}
+            } catch (const std::exception& e) {
+                std::cerr << "[GatewayTranslator] ERROR: " << e.what() << "\n";
+            } catch (...) {
+                std::cerr << "[GatewayTranslator] UNKNOWN ERROR!\n";
+            }
         };
     }
 
@@ -80,7 +100,11 @@ public:
                 uint16_t target_addr = dto.element_addr != 0 ? static_cast<uint16_t>(dto.element_addr) : ::unicast_from_node_id(dto.node_id);
                 if (target_addr == 0) throw std::invalid_argument("invalid target_addr");
                 sender.actuator_set_auto(target_addr, dto.actuator_type, dto.is_auto);
-            } catch (...) {}
+            } catch (const std::exception& e) {
+                std::cerr << "[GatewayTranslator] ERROR: " << e.what() << "\n";
+            } catch (...) {
+                std::cerr << "[GatewayTranslator] UNKNOWN ERROR!\n";
+            }
         };
     }
 
@@ -91,7 +115,11 @@ public:
                 uint16_t target_addr = dto.element_addr != 0 ? static_cast<uint16_t>(dto.element_addr) : ::unicast_from_node_id(dto.node_id);
                 if (target_addr == 0) throw std::invalid_argument("Invalid target_addr");
                 sender.actuator_set(target_addr, dto.device_type, dto.setpoint, dto.onoff, dto.status);
-            } catch (...) {}
+            } catch (const std::exception& e) {
+                std::cerr << "[GatewayTranslator] ERROR: " << e.what() << "\n";
+            } catch (...) {
+                std::cerr << "[GatewayTranslator] UNKNOWN ERROR!\n";
+            }
         };
     }
 
@@ -106,7 +134,11 @@ public:
                     throw std::invalid_argument("Invalid target_addr");
                 }
                 sender.threshold_config(target_addr, dto.src_addr, dto.threshold_on, dto.threshold_off, dto.threshold_type, dto.actuator_type);
-            } catch (...) {}
+            } catch (const std::exception& e) {
+                std::cerr << "[GatewayTranslator] ERROR: " << e.what() << "\n";
+            } catch (...) {
+                std::cerr << "[GatewayTranslator] UNKNOWN ERROR!\n";
+            }
         };
     }
 
@@ -117,7 +149,11 @@ public:
                 uint16_t uni = get_primary_addr(dto.node_id, dto.element_addr, node_register);
                 if (uni == 0) throw std::invalid_argument("Invalid node_id: " + dto.node_id);
                 sender.group_add(uni, dto.element_addr, dto.group_addr, dto.model_id, dto.company_id);
-            } catch (...) {}
+            } catch (const std::exception& e) {
+                std::cerr << "[GatewayTranslator] ERROR: " << e.what() << "\n";
+            } catch (...) {
+                std::cerr << "[GatewayTranslator] UNKNOWN ERROR!\n";
+            }
         };
     }
 
@@ -126,9 +162,15 @@ public:
             try {
                 auto dto = ipc_to_dto<GroupDeleteDto>(msg);
                 uint16_t uni = get_primary_addr(dto.node_id, dto.element_addr, node_register);
-                if (uni == 0) throw std::invalid_argument("Invalid node_id: " + dto.node_id);
+                if (uni == 0) {
+                    throw std::invalid_argument("Invalid node_id: " + dto.node_id);
+                }
                 sender.group_delete(uni, dto.element_addr, dto.group_addr, dto.model_id, dto.company_id);
-            } catch (...) {}
+            } catch (const std::exception& e) {
+                std::cerr << "[GatewayTranslator] ERROR: " << e.what() << "\n";
+            } catch (...) {
+                std::cerr << "[GatewayTranslator] UNKNOWN ERROR!\n";
+            }
         };
     }
 
@@ -139,7 +181,11 @@ public:
                 uint16_t uni = get_primary_addr(dto.node_id, dto.element_addr, node_register);
                 if (uni == 0) throw std::invalid_argument("Invalid node_id: " + dto.node_id);
                 sender.model_pub_set(uni, dto.element_addr, dto.group_addr, dto.model_id, dto.company_id, dto.pub_ttl, dto.pub_period);
-            } catch (...) {}
+            } catch (const std::exception& e) {
+                std::cerr << "[GatewayTranslator] ERROR: " << e.what() << "\n";
+            } catch (...) {
+                std::cerr << "[GatewayTranslator] UNKNOWN ERROR!\n";
+            }
         };
     }
 };

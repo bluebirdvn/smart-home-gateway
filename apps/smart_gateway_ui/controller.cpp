@@ -114,6 +114,7 @@ void Controller::setActuatorManual(const QString &nodeId, int deviceType, bool s
     dto.node_id = nodeId;
     dto.element_addr = device_models->getNodeAddr(nodeId);
     dto.actuator_type = device_models->getDeviceType(nodeId); 
+    dto.device_type   = device_models->getDeviceType(nodeId);
     dto.device_type = deviceType;
     dto.onoff = state;
     emit reqSendActuator(dto);
@@ -229,6 +230,7 @@ void Controller::setAcManual(const QString &nodeId, bool power, int mode, int fa
     dto.element_addr  = device_models->getNodeAddr(nodeId);
     dto.actuator_type = device_models->getDeviceType(nodeId);
     dto.setpoint      = qBound(16, temp, 30);
+    dto.device_type   = device_models->getDeviceType(nodeId);
     dto.status        = status;
     dto.onoff         = power;
     emit reqSendActuator(dto);
@@ -241,6 +243,7 @@ void Controller::setLightManual(const QString &nodeId, bool on, int brightness) 
     dto.element_addr  = device_models->getNodeAddr(nodeId);
     dto.actuator_type = device_models->getDeviceType(nodeId);
     dto.setpoint      = on ? qBound(0, brightness, 100) : 0;
+    dto.device_type   = device_models->getDeviceType(nodeId);
     dto.status        = on ? 1 : 0;
     dto.onoff         = on;
     emit reqSendActuator(dto);

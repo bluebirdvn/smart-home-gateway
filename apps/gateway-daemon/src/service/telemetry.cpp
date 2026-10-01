@@ -56,6 +56,7 @@ void Telemetry::onSensorStatus(const MeshFrame& f)
     dto.node_id = MeshUtils::node_id_from_unicast(f.addr);
     dto.element_addr = f.addr;
     dto.temperature = p->temperature / 10.0;
+    dto.soil_moisture = p->soil_moisture;
     dto.humidity = static_cast<double>(p->humidity);
     dto.lux = static_cast<double>(p->lux);
     dto.motion = p->motion;
