@@ -1,22 +1,19 @@
 #!/bin/bash
 
-IMAGE_DIR="./build/tmp/deploy/images/raspberrypi0-2w-64"
-
 echo "find image.."
 
-IMAGE_FILE=$(ls -t ${IMAGE_DIR}/*.wic 2>/dev/null | head -n 1)
+IMAGE_FILE=$(ls -t ./build/tmp*/deploy/images/raspberrypi0-2w-64/*.wic 2>/dev/null | head -n 1)
 
 if [ -z "$IMAGE_FILE" ]; then
     echo "don't find out image"
     exit 1
 fi
 
-echo "found"
+echo "found: $IMAGE_FILE"
 
 echo "please plug sd card"
 
 OLD_DRIVES=$(lsblk -d -n -o NAME)
-
 
 while true; do
     NEW_DRIVES=$(lsblk -d -n -o NAME)
@@ -40,7 +37,6 @@ while true; do
                     sudo dd if="${IMAGE_FILE}" of="${TARGET_DEV}" bs=4M status=progress oflag=sync
                     
                     echo "flash success"
-
                     
                     exit 0
                 else

@@ -79,7 +79,7 @@ int main(int argc, char *argv[])
         },
         Qt::QueuedConnection);
 
-    engine.loadFromModule("smart_gateway_ui", "Main");
+    engine.loadFromModule("SmartGatewayUI", "Main");
 
     int ret = app.exec();
     QMetaObject::invokeMethod(ipc, &QDbusImpl::deinit, Qt::BlockingQueuedConnection);
