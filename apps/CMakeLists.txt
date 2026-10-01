@@ -14,7 +14,7 @@ option(BUILD_MQTT "Build MQTT Connect" OFF)
 option(BUILD_UI "Build Qt UI" OFF)
 
 if(BUILD_GATEWAY)
-    add_subdirectory(gateway-app)
+    add_subdirectory(gateway-daemon)
 endif()
 
 if(BUILD_DATABASE)

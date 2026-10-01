@@ -7,9 +7,8 @@ SRCREV = "${AUTOREV}"
 DEPENDS = "glib-2.0 dbus"
 
 S = "${WORKDIR}/git/apps"
-
-S = "${WORKDIR}/git/apps"
 inherit cmake pkgconfig
+
 EXTRA_OECMAKE += "-DBUILD_GATEWAY=ON"
 OECMAKE_TARGET_COMPILE = "gateway-daemon"
 
