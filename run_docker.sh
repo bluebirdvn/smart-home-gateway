@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 HOST_UID=$(id -u)
 HOST_GUID=$(id -g)
 

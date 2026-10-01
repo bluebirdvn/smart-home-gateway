@@ -24,11 +24,11 @@ do_install() {
 }
 
 RDEPENDS:${PN} += " \
-    gateway-daemon \
-    local-database \
+    gateway-app \
+    local-database-app \
     mqtt-connect \
-    smart-gateway-ui \
-    gateway-configs \
+    ui-app \
+    apps-config \
 "
 
 FILES:${PN} += " \

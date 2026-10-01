@@ -1,1 +1,1 @@
-EXTRA_OECONF:append = " no-engine"
+# EXTRA_OECONF:append = " no-engine"

@@ -2,14 +2,15 @@ SUMMARY = "gateway-app daemon for gateway smarthome"
 LICENSE = "MIT"
 
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
-
-SRC_URI = "git://github.com/ten-cua-ban/smart-home-gateway.git;protocol=https;branch=main"
+SRC_URI = "git://github.com/bluebirdvn/smart-home-gateway.git;protocol=https;branch=main"
 SRCREV = "${AUTOREV}"
 DEPENDS = "glib-2.0 dbus"
 
 S = "${WORKDIR}/git/apps"
-inherit cmake pkgconfig
 
+S = "${WORKDIR}/git/apps"
+inherit cmake pkgconfig
+EXTRA_OECMAKE += "-DBUILD_GATEWAY=ON"
 OECMAKE_TARGET_COMPILE = "gateway-daemon"
 
 do_install() {
