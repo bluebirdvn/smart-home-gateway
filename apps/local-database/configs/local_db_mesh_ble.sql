@@ -1,10 +1,9 @@
 CREATE TABLE IF NOT EXISTS node (
-    node_id      TEXT PRIMARY KEY,                
+    element_addr INTEGER PRIMARY KEY,       
     uuid         TEXT NOT NULL,            
     name         TEXT NOT NULL DEFAULT '',
     kind         TEXT NOT NULL DEFAULT 'unknown',  
     unicast      INTEGER NOT NULL DEFAULT 0,       
-    element_addr INTEGER NOT NULL DEFAULT 0,       
     elem_num     INTEGER NOT NULL DEFAULT 1,
     net_idx      INTEGER NOT NULL DEFAULT 0,
     company_id   INTEGER NOT NULL DEFAULT 65535,
@@ -18,7 +17,7 @@ CREATE INDEX IF NOT EXISTS idx_node_unicast ON node(unicast) WHERE unicast <> 0;
 
 CREATE TABLE IF NOT EXISTS sensor_reading (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    node_id     TEXT NOT NULL REFERENCES node(node_id) ON DELETE CASCADE,
+    element_addr  INTEGER NOT NULL REFERENCES node(element_addr) ON DELETE CASCADE,
     temperature REAL NOT NULL DEFAULT 0,
     humidity    REAL NOT NULL DEFAULT 0,
     soil_moisture REAL NOT NULL DEFAULT 0,
@@ -27,12 +26,11 @@ CREATE TABLE IF NOT EXISTS sensor_reading (
     battery     INTEGER NOT NULL DEFAULT 0,
     ts          INTEGER NOT NULL DEFAULT (unixepoch())
 );
-CREATE INDEX IF NOT EXISTS idx_sensor_node_ts ON sensor_reading(node_id, ts DESC);
+CREATE INDEX IF NOT EXISTS idx_sensor_node_ts ON sensor_reading(element_addr, ts DESC);
 CREATE INDEX IF NOT EXISTS idx_sensor_ts      ON sensor_reading(ts);
 
 CREATE TABLE IF NOT EXISTS actuator (
-    node_id          TEXT NOT NULL REFERENCES node(node_id) ON DELETE CASCADE,
-    actuator_id      INTEGER NOT NULL,
+    element_addr  INTEGER PRIMARY KEY REFERENCES node(element_addr) ON DELETE CASCADE,
     actuator_type    INTEGER NOT NULL DEFAULT 0,
     present_setpoint REAL NOT NULL DEFAULT 0,
     target_setpoint  REAL NOT NULL DEFAULT 0,
@@ -45,7 +43,6 @@ CREATE TABLE IF NOT EXISTS actuator (
     threshold_off    REAL NOT NULL DEFAULT 0,
     threshold_type   INTEGER NOT NULL DEFAULT 0,
     updated_at       INTEGER NOT NULL DEFAULT (unixepoch()),
-    PRIMARY KEY (node_id, actuator_id)
 );
 
 CREATE TABLE IF NOT EXISTS mesh_group (
@@ -61,13 +58,13 @@ CREATE TABLE IF NOT EXISTS mesh_group (
 
 CREATE TABLE IF NOT EXISTS mesh_group_member (
     group_id     INTEGER NOT NULL REFERENCES mesh_group(group_id) ON DELETE CASCADE,
-    node_id      TEXT    NOT NULL REFERENCES node(node_id)        ON DELETE CASCADE,
+    element_addr      INTEGER NOT NULL REFERENCES node(element_addr)        ON DELETE CASCADE,
     role         TEXT    NOT NULL CHECK (role IN ('sensor','actuator')),
     mesh_applied INTEGER NOT NULL DEFAULT 0,
     applied_at   INTEGER NOT NULL DEFAULT 0,
-    PRIMARY KEY (group_id, node_id, role)
+    PRIMARY KEY (group_id, element_addr, role)
 );
-CREATE INDEX IF NOT EXISTS idx_member_node ON mesh_group_member(node_id);
+CREATE INDEX IF NOT EXISTS idx_member_node ON mesh_group_member(element_addr);
 
 CREATE TABLE IF NOT EXISTS uuid_whitelist (
     uuid        TEXT PRIMARY KEY,                 

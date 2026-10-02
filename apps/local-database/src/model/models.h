@@ -6,12 +6,11 @@
 #include <vector>
 
 struct Node {
-    std::string node_id;
+    int element_addr = 0;
     std::string uuid;
     std::string name;
     std::string kind = "unknown";
     int unicast = 0;
-    int element_addr = 0;
     int elem_num = 1;
     int net_idx = 0;
     int company_id = 65535;
@@ -24,7 +23,7 @@ struct Node {
 
 struct SensorReading {
     int64_t id = 0;
-    std::string node_id;
+    int element_addr = 0;
     double temperature = 0.0;
     double humidity = 0.0;
     double soil_moisture = 0.0;
@@ -35,7 +34,7 @@ struct SensorReading {
 };
 
 struct Actuator {
-    std::string node_id;
+    int element_addr = 0;
     int actuator_type = 0;
     double present_setpoint = 0.0;
     double target_setpoint = 0.0;
@@ -63,7 +62,7 @@ struct MeshGroup {
 
 struct MeshGroupMember {
     int64_t group_id = 0;
-    std::string node_id;
+    int element_addr = 0;
     std::string role; 
     int mesh_applied = 0;
     int64_t applied_at = 0;

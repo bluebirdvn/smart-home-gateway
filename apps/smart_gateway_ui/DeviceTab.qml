@@ -1,4 +1,3 @@
-
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -9,6 +8,14 @@ Item {
 
     property var selectedSensor: ({})
     property var selectedActuator: ({})
+
+    Connections {
+        target: MyDevice
+        function onPendingChanged(addr, isPending) {
+            if (addr === devTabRoot.selectedActuator.addr)
+                actuatorPopup.pending = isPending
+        }
+    }
 
     ColumnLayout {
         anchors.fill: parent
@@ -154,9 +161,9 @@ Item {
 
                         onClicked: {
                             devTabRoot.selectedSensor = {
-                                nodeId: model.nodeId,
                                 name: model.devName,
-                                addr: model.devAddr,
+                                addr: model.devAddrNum,      
+                                addrText: model.devAddr,     
                                 uuid: model.devUuid,
                                 temp: model.devTemp,
                                 humi: model.devHumi,
@@ -207,17 +214,17 @@ Item {
                             }
                             Text {
                                 Layout.leftMargin: 10
-                                text: model.devState > 0 ? "ON" : "OFF"
-                                color: model.devState > 0 ? "#2E7D32" : "#C62828"
+                                text: ((model.devState & 1) ? "ON" : "OFF") + (model.devPending ? "  (pending...)" : "")
+                                color: model.devPending ? "#EF6C00" : ((model.devState & 1) ? "#2E7D32" : "#C62828")
                                 font.pixelSize: 10; font.bold: true
                             }
                         }
 
                         onClicked: {
                             devTabRoot.selectedActuator = {
-                                nodeId: model.nodeId,
                                 name: model.devName,
-                                addr: model.devAddr,
+                                addr: model.devAddrNum,
+                                addrText: model.devAddr,
                                 uuid: model.devUuid,
                                 state: model.devState,
                                 setpoint: model.devSetpoint,
@@ -287,7 +294,7 @@ Item {
                     ColumnLayout {
                         Layout.fillWidth: true
                         spacing: 1
-                        Text { text: "ID: " + devTabRoot.selectedSensor.nodeId; color: "#546E7A"; font.pixelSize: 9 }
+                        Text { text: "Addr: " + devTabRoot.selectedSensor.addrText; color: "#546E7A"; font.pixelSize: 9 }
                         Text {
                             text: "Pin: " + (devTabRoot.selectedSensor.battery >= 0 ? (devTabRoot.selectedSensor.battery + "%") : "N/A")
                             color: "#546E7A"; font.pixelSize: 9
@@ -333,29 +340,28 @@ Item {
         modal: true
         focus: true
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+
         readonly property bool isAc: devTabRoot.selectedActuator.isAc === true
         readonly property bool isLight: devTabRoot.selectedActuator.isLight === true
 
+        property bool pending: false
         property bool power: false
-        property int acMode: 0
-        property int acFan: 0
-        property int acTemp: 24
-
+        property int  acMode: 0          // 0 = cool, 1 = dry
+        property int  acFan: 0           // 0 = low, 1 = medium, 2 = high
+        property int  acTemp: 24
         readonly property int acMinTemp: 16
         readonly property int acMaxTemp: 30
-
         property int  brightness: 100
         readonly property int minBrightness: 10
 
         function send() {
-            var id = devTabRoot.selectedActuator.nodeId
-            if (isAc) {
-                GatewayController.setAcManual(id, power, acMode, acFan, acTemp)
-            } else if (isLight) {
-                GatewayController.setLightManual(id, power, brightness)
-            } else {
-                GatewayController.setActuatorManual(id, 0, power)
-            }
+            var addr = devTabRoot.selectedActuator.addr
+            if (isAc)
+                GatewayController.setAcManual(addr, power, acMode, acFan, acTemp)
+            else if (isLight)
+                GatewayController.setLightManual(addr, power, brightness)
+            else
+                GatewayController.setActuatorManual(addr, power)
         }
 
         onOpened: {
@@ -364,20 +370,16 @@ Item {
                 s = 0
             }
             var sp = Math.round(devTabRoot.selectedActuator.setpoint)
-            power = (s & 1) === 1
-            acMode = Math.min((s >> 1) & 0x03, 1)
+            power      = (s & 1) === 1
+            acMode     = Math.min((s >> 1) & 0x03, 1)
             acFan      = Math.min((s >> 3) & 0x03, 2)
             acTemp     = (sp >= acMinTemp && sp <= acMaxTemp) ? sp : 24
             brightness = (sp >= minBrightness && sp <= 100) ? sp : 100
-            powerSwitch.checked = power
+            powerSwitch.checked = power          // a Switch loses its binding after the first toggle
+            pending = MyDevice.isPending(devTabRoot.selectedActuator.addr)
         }
 
-
-        background: Rectangle {
-            color: "#FFFFFF"
-            border.color: "#90A4AE"
-            border.width: 1
-            }
+        background: Rectangle { color: "#FFFFFF"; border.color: "#90A4AE"; border.width: 1 }
 
         ColumnLayout {
             anchors.fill: parent
@@ -414,15 +416,10 @@ Item {
                 spacing: 3
 
                 Text {
-                    text: "Node ID: " + devTabRoot.selectedActuator.nodeId
+                    text: "Mesh Addr: " + devTabRoot.selectedActuator.addrText
                     color: "#546E7A"
                     font.pixelSize: 10
-                    }
-                Text {
-                    text: "Mesh Addr: " + devTabRoot.selectedActuator.addr
-                    color: "#546E7A"
-                    font.pixelSize: 10
-                    }
+                }
                 Text {
                     text: "Status: " + (devTabRoot.selectedActuator.status === 1 ? "ONLINE" : "OFFLINE")
                     color: devTabRoot.selectedActuator.status === 1 ? "#2E7D32" : "#C62828"
@@ -433,21 +430,12 @@ Item {
                 ColumnLayout {
                     visible: actuatorPopup.isAc
                     Layout.fillWidth: true
-
                     spacing: 4
 
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: 4
-
-                        Text {
-                            text: "Mode:"
-                            color: "#263238"
-                            font.pixelSize: 10
-                            font.bold: true
-                            Layout.preferredWidth: 44
-                            }
-
+                        Text { text: "Mode:"; color: "#263238"; font.pixelSize: 10; font.bold: true; Layout.preferredWidth: 44 }
                         Repeater {
                             model: ["Cool", "Dry"]
                             MyButton {
@@ -464,14 +452,7 @@ Item {
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: 4
-                        Text {
-                            text: "Temp:"
-                            color: "#263238"
-                            font.pixelSize: 10
-                            font.bold: true
-                            Layout.preferredWidth: 44
-                            }
-
+                        Text { text: "Temp:"; color: "#263238"; font.pixelSize: 10; font.bold: true; Layout.preferredWidth: 44 }
                         MyButton {
                             text: "-"
                             implicitHeight: 26
@@ -508,8 +489,6 @@ Item {
                             }
                         }
                     }
-
-
                 }
 
                 RowLayout {
@@ -553,9 +532,12 @@ Item {
                             actuatorPopup.send()
                         }
                     }
-                    Item {
-                        Layout.fillWidth: true
-                        }
+                    Text {
+                        visible: actuatorPopup.pending
+                        text: "pending..."
+                        color: "#EF6C00"; font.pixelSize: 9; font.bold: true
+                    }
+                    Item { Layout.fillWidth: true }
 
                     MyButton {
                         visible: actuatorPopup.isAc || actuatorPopup.isLight
@@ -571,10 +553,10 @@ Item {
                                 powerSwitch.checked = true
                             }
                             actuatorPopup.send()
+                            actuatorPopup.close()
                         }
                     }
                 }
-
             }
         }
     }

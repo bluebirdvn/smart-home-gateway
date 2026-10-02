@@ -17,7 +17,7 @@ public:
 
     void upsert(const Node& n) {
         const char* sql =
-            "INSERT OR REPLACE INTO node(node_id, uuid, name, kind, unicast, element_addr, elem_num, "
+            "INSERT OR REPLACE INTO node(element_addr, uuid, name, kind, unicast, element_addr, elem_num, "
             "net_idx, company_id, model_id, features, is_online, last_seen, created_at) "
             "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,COALESCE(NULLIF(?,0), unixepoch()))";
 
@@ -25,7 +25,7 @@ public:
         if (sqlite3_prepare_v2(database, sql, -1, &stmt, nullptr) != SQLITE_OK)
             throw std::runtime_error(sqlite3_errmsg(database));
 
-        sqlite3_bind_text(stmt, 1, n.node_id.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_int(stmt, 1, n.element_addr);
         sqlite3_bind_text(stmt, 2, n.uuid.c_str(), -1, SQLITE_TRANSIENT);
         sqlite3_bind_text(stmt, 3, n.name.c_str(), -1, SQLITE_TRANSIENT);
         sqlite3_bind_text(stmt, 4, n.kind.c_str(), -1, SQLITE_TRANSIENT);
@@ -44,16 +44,16 @@ public:
             throw std::runtime_error(sqlite3_errmsg(database));
         }
         sqlite3_finalize(stmt);
-        DB_LOG_NODE("UPSERT", "node_id=" + n.node_id);
+        DB_LOG_NODE("UPSERT", "element_addr=" + std::to_string(n.element_addr));
     }
 
-    std::optional<Node> findById(const std::string& node_id) {
-        const char* sql = "SELECT * FROM node WHERE node_id=?";
+    std::optional<Node> findByElementAddr(int element_addr) {
+        const char* sql = "SELECT * FROM node WHERE element_addr=?";
         sqlite3_stmt* stmt = nullptr;
         if (sqlite3_prepare_v2(database, sql, -1, &stmt, nullptr) != SQLITE_OK) {
             throw std::runtime_error(sqlite3_errmsg(database));
         }
-        sqlite3_bind_text(stmt, 1, node_id.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_int(stmt, 1, element_addr);
 
         std::optional<Node> result = std::nullopt;
         if (sqlite3_step(stmt) == SQLITE_ROW) {
@@ -77,8 +77,8 @@ public:
         return res;
     }
 
-    void updateStatus(const std::string& node_id, int is_online, int64_t last_seen = time(nullptr)) {
-        const char* sql = "UPDATE node SET is_online=?, last_seen=? WHERE node_id=?";
+    void updateStatus(int element_addr, int is_online, int64_t last_seen = time(nullptr)) {
+        const char* sql = "UPDATE node SET is_online=?, last_seen=? WHERE element_addr=?";
         sqlite3_stmt* stmt = nullptr;
         if (sqlite3_prepare_v2(database, sql, -1, &stmt, nullptr) != SQLITE_OK) {
             throw std::runtime_error(sqlite3_errmsg(database));
@@ -86,27 +86,26 @@ public:
 
         sqlite3_bind_int(stmt, 1, is_online);
         sqlite3_bind_int64(stmt, 2, last_seen);
-        sqlite3_bind_text(stmt, 3, node_id.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_int(stmt, 3, element_addr);
         sqlite3_step(stmt);
         sqlite3_finalize(stmt);
     }
 
-    void deleteById(const std::string& node_id) {
-        const char* sql = "DELETE FROM node WHERE node_id=?";
+    void deleteByUnicast(int unicast) {
+        const char* sql = "DELETE FROM node WHERE unicast=?";
         sqlite3_stmt* stmt = nullptr;
         if (sqlite3_prepare_v2(database, sql, -1, &stmt, nullptr) != SQLITE_OK) {
             throw std::runtime_error(sqlite3_errmsg(database));
         }
-        sqlite3_bind_text(stmt, 1, node_id.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_int(stmt, 1, unicast);
         sqlite3_step(stmt);
         sqlite3_finalize(stmt);
-        DB_LOG_NODE("DELETE", "node_id=" + node_id);
+        DB_LOG_NODE("DELETE", "unicast=" + std::to_string(unicast));
     }
 
 private:
     static Node row_to_node(sqlite3_stmt* stmt) {
         Node n;
-        n.node_id      = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
         n.uuid         = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
         n.name         = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
         n.kind         = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));

@@ -2,7 +2,7 @@
 
 #include "mqtt_translator.h"
 #include "ipc_dto.h"
-#include "json_utils.h"
+#include "json_use.h"
 #include "mqtt_connection_config.h"
 #include "ipc_message.h"
 #include "ipc.h"
@@ -117,7 +117,7 @@ void GatewayBridge::subscribeTopics()
 
 MQTTConnectionConfig GatewayBridge::loadMqttConfig(const std::string& path)
 {
-    MQTTConnectionConfig cfg;
+    MQTTConnectionConfig cfg{};
 
     std::ifstream ifs(path);
     if (!ifs.is_open()) {
@@ -129,32 +129,37 @@ MQTTConnectionConfig GatewayBridge::loadMqttConfig(const std::string& path)
     buf << ifs.rdbuf();
     const std::string json = buf.str();
 
-    std::string host = jutil::get_str(json, "host", "localhost");
-    int32_t     port = jutil::get_int(json, "port", 1883);
-    cfg.havingTLS = jutil::get_bool(json, "use_tls", false);
+    JsonUse::CJsonGuard root(json);
+    if (!root.ptr) {
+        std::cerr << "invalid mqtt config JSON: " << path << "\n";
+        return cfg;
+    }
+
+    std::string host = JsonUse::get_str(root.ptr, "host", "localhost");
+    int32_t     port = static_cast<int32_t>(JsonUse::get_int(root.ptr, "port", 1883));
+
+    cfg.havingTLS = JsonUse::get_bool(root.ptr, "use_tls", false);
     std::string scheme = cfg.havingTLS ? "ssl://" : "tcp://";
     cfg.brokerURL = scheme + host + ":" + std::to_string(port);
     cfg.port = static_cast<uint16_t>(port);
-    cfg.clientID = jutil::get_str(json, "client_id", "gateway_mqtt_bridge");
-    cfg.userName = jutil::get_str(json, "username", "");
-    cfg.password = jutil::get_str(json, "password", "");
-    cfg.cleanSession = jutil::get_bool(json, "clean_session", true);
-    cfg.keepAliveInterval = static_cast<uint16_t>(jutil::get_int(json, "keep_alive", 30));
+
+    cfg.clientID = JsonUse::get_str(root.ptr, "client_id", "gateway_mqtt_bridge");
+    cfg.userName = JsonUse::get_str(root.ptr, "username", "");
+    cfg.password = JsonUse::get_str(root.ptr, "password", "");
+    cfg.cleanSession = JsonUse::get_bool(root.ptr, "clean_session", true);
+    cfg.keepAliveInterval = static_cast<uint16_t>(JsonUse::get_int(root.ptr, "keep_alive", 30));
 
     if (cfg.havingTLS) {
-        cfg.tls.caFile       = jutil::get_str(json, "ca_file", "");
-        cfg.tls.certFile     = jutil::get_str(json, "cert_file", "");
-        cfg.tls.keyFile      = jutil::get_str(json, "key_file", "");
-        cfg.tls.verifyServer = jutil::get_bool(json, "verify_server", true);
+        cfg.tls.caFile       = JsonUse::get_str(root.ptr, "ca_file", "");
+        cfg.tls.certFile     = JsonUse::get_str(root.ptr, "cert_file", "");
+        cfg.tls.keyFile      = JsonUse::get_str(root.ptr, "key_file", "");
+        cfg.tls.verifyServer = JsonUse::get_bool(root.ptr, "verify_server", true);
     } else {
-        cfg.tls.caFile = "";
-        cfg.tls.certFile = "";
-        cfg.tls.keyFile = "";
+        cfg.tls.caFile = cfg.tls.certFile = cfg.tls.keyFile = "";
         cfg.tls.verifyServer = false;
     }
     return cfg;
 }
-
 
 void GatewayBridge::run()
 {

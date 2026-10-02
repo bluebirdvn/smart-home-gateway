@@ -69,7 +69,6 @@ struct unProvisionDevice
  */
 struct deviceInfo
 {
-    QString nodeId;
     int      id = 0;
     uint16_t unicast = 0; 
     uint16_t addr = 0;
@@ -82,6 +81,8 @@ struct deviceInfo
     uint16_t model_id = 0;
     uint16_t company_id = 0xFFFF;
     int      features = 0;
+    bool    pending = false;
+    quint64 pendingSince = 0;
 };
 
 
@@ -106,8 +107,8 @@ public:
      * 
      */
     enum DeviceRoles {
-        NodeIDRole = Qt::UserRole + 1, 
-        AddrRole, 
+        AddrRole = Qt::UserRole + 1,
+        AddrNumRole,
         NameRole, 
         NodeTypeRole, 
         StatusRole,
@@ -125,6 +126,7 @@ public:
         FeaturesRole,
         IsAcRole,
         IsLightRole,
+        PendingRole,
     };
 
     /**
@@ -136,6 +138,7 @@ public:
     int rowCount(const QModelIndex &parent = QModelIndex()) const override;
     QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
     QHash<int, QByteArray> roleNames() const override;
+    QString nameByAddr(int addr) const;
 
 
     /**
@@ -167,17 +170,21 @@ public:
     float avgSoil() const { 
         return average_soil; 
     }
-    uint16_t getNodeUnicast(const QString &nodeId) const;
     
 
     int activeDevices() const;
 
-    uint16_t getNodeAddr(const QString &nodeId) const;
-    uint16_t getNodeModelId(const QString &nodeId) const;
-    uint16_t getNodeCompanyId(const QString &nodeId) const;
-    QString  getNodeUuid(const QString &nodeId) const;
-    int32_t  getDeviceType(const QString &nodeId) const;
+    uint16_t getUnicastByAddr(const uint16_t &addr) const;
+    uint16_t getNodeAddr(const uint16_t &addr) const;
+    uint16_t getNodeModelId(const uint16_t &addr) const;
+    uint16_t getNodeCompanyId(const uint16_t &addr) const;
+    QString  getNodeUuid(const uint16_t &addr) const;
+    int32_t  getDeviceType(const uint16_t &addr) const;
 
+    void setPending(uint16_t addr, bool pending);
+
+
+    Q_INVOKABLE bool isPending(int addr) const;
 
     /**
      * @brief UPDATE data comming, called by controller
@@ -186,7 +193,7 @@ public:
     /**
      * @brief store a new sensor reading and mark the node online
      * 
-     * @param nodeId 
+     * @param addr 
      * @param temp 
      * @param humi 
      * @param soil 
@@ -196,12 +203,12 @@ public:
      * @param lastSeen 
      * @return Q_INVOKABLE 
      */
-    Q_INVOKABLE void updateSensorData(const QString &nodeId, float temp, float humi, float soil, float lux, float motion, int battery, quint64 lastSeen);
+    Q_INVOKABLE void updateSensorData(const uint16_t &addr, float temp, float humi, float soil, float lux, float motion, int battery, quint64 lastSeen);
 
     /**
      * @brief add a newly provisioned node, or refresh it if it existed
      * 
-     * @param nodeId 
+     * @param addr 
      * @param name 
      * @param uuid 
      * @param unicast 
@@ -210,45 +217,45 @@ public:
      * @param companyId 
      * @return Q_INVOKABLE 
      */
-    Q_INVOKABLE void onProvisionSuccess(const QString &nodeId, const QString& name, const QString &uuid, uint16_t unicast, uint16_t element_addr, uint16_t modelId, uint16_t companyId);
+    Q_INVOKABLE void onProvisionSuccess(const uint16_t &addr, const QString& name, const QString &uuid, uint16_t unicast, uint16_t modelId, uint16_t companyId);
 
     /**
      * @brief stored lastest actuator data and mark it online
      * 
-     * @param nodeId 
+     * @param addr 
      * @param actuatorId 
      * @param setpoint 
      * @param status 
      * @param lastSeen 
      * @return Q_INVOKABLE 
      */
-    Q_INVOKABLE void updateActuatorStatus(const QString &nodeId, int actuatorId, float setpoint, int status, quint64 lastSeen);
+    Q_INVOKABLE void updateActuatorStatus(const uint16_t &addr, int actuatorId, float setpoint, int status, quint64 lastSeen);
 
     /**
      * @brief mark node online
      * 
-     * @param nodeId 
+     * @param addr 
      * @param features 
      * @param lastSeen 
      * @return Q_INVOKABLE 
      */
-    Q_INVOKABLE void markOnline(const QString &nodeId, int features, quint64 lastSeen);
+    Q_INVOKABLE void markOnline(const uint16_t &addr, int features, quint64 lastSeen);
 
     /**
      * @brief mark node offline
      * 
-     * @param nodeId 
+     * @param addr 
      * @return Q_INVOKABLE 
      */
-    Q_INVOKABLE void markOffline(const QString &nodeId);
+    Q_INVOKABLE void markOffline(const uint16_t &addr);
 
     /**
      * @brief delete device from list
      * 
-     * @param nodeId 
+     * @param addr 
      * @return Q_INVOKABLE 
      */
-    Q_INVOKABLE void deleteDeviceById(const QString &nodeId);
+    Q_INVOKABLE void deleteDeviceByUnicast(const uint16_t &addr);
 
     /**
      * @brief clear all node and reset average values
@@ -279,6 +286,8 @@ signals:
     void deviceCountChanged();
     void unprovListChanged();
     void averagesChanged();
+    void pendingChanged(int addr, bool pending);
+    void pendingTimedOut(int addr);
 
 private:
     QList<deviceInfo> devices;

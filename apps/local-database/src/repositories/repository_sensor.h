@@ -13,7 +13,7 @@ public:
 
     void insert(const SensorReading& s) {
         const char* sql =
-            "INSERT INTO sensor_reading(node_id, temperature, humidity, soil_moisture, lux, motion, battery, ts) "
+            "INSERT INTO sensor_reading(element_addr, temperature, humidity, soil_moisture, lux, motion, battery, ts) "
             "VALUES(?,?,?,?,?,?,?,COALESCE(NULLIF(?,0), unixepoch()))";
 
         sqlite3_stmt* stmt = nullptr;
@@ -21,7 +21,7 @@ public:
             throw std::runtime_error(sqlite3_errmsg(database));
         }
 
-        sqlite3_bind_text(stmt, 1, s.node_id.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_int(stmt, 1, s.element_addr);
         sqlite3_bind_double(stmt, 2, s.temperature);
         sqlite3_bind_double(stmt, 3, s.humidity);
         sqlite3_bind_double(stmt, 4, s.soil_moisture); 
@@ -48,14 +48,14 @@ public:
         return res;
     }
 
-    std::vector<SensorReading> findByNodeId(const std::string& node_id, int limit = 50) {
-        const char* sql = "SELECT * FROM sensor_reading WHERE node_id=? ORDER BY ts DESC LIMIT ?";
+    std::vector<SensorReading> findByElementAddr(int element_addr, int limit = 50) {
+        const char* sql = "SELECT * FROM sensor_reading WHERE element_addr=? ORDER BY ts DESC LIMIT ?";
         sqlite3_stmt* stmt = nullptr;
         if (sqlite3_prepare_v2(database, sql, -1, &stmt, nullptr) != SQLITE_OK) {
             throw std::runtime_error(sqlite3_errmsg(database));
         }
         
-        sqlite3_bind_text(stmt, 1, node_id.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_int(stmt, 1, element_addr);
         sqlite3_bind_int(stmt, 2, limit);
 
         std::vector<SensorReading> res;
@@ -64,13 +64,13 @@ public:
         return res;
     }
 
-    void deleteAllByNode(const std::string& node_id) {
-        const char* sql = "DELETE FROM sensor_reading WHERE node_id=?";
+    void deleteAllByNode(int element_addr) {
+        const char* sql = "DELETE FROM sensor_reading WHERE element_addr=?";
         sqlite3_stmt* stmt = nullptr;
         if (sqlite3_prepare_v2(database, sql, -1, &stmt, nullptr) != SQLITE_OK) {
             throw std::runtime_error(sqlite3_errmsg(database));
         }
-        sqlite3_bind_text(stmt, 1, node_id.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_int(stmt, 1, element_addr);
         sqlite3_step(stmt);
         sqlite3_finalize(stmt);
     }
@@ -79,8 +79,8 @@ private:
     static SensorReading row_to_sensor(sqlite3_stmt* stmt) {
         SensorReading s;
         s.id          = sqlite3_column_int64(stmt, 0);
-        const char* nid = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
-        s.node_id     = nid ? nid : "";
+        s.element_addr = sqlite3_column_int(stmt, 1);
+
         s.temperature = sqlite3_column_double(stmt, 2);
         s.humidity    = sqlite3_column_double(stmt, 3);
         s.soil_moisture = sqlite3_column_double(stmt, 4); 

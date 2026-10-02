@@ -14,7 +14,7 @@ public:
 
     void upsert(const Actuator& a) {
         const char* sql =
-            "INSERT OR REPLACE INTO actuator(node_id, actuator_type, present_setpoint, "
+            "INSERT OR REPLACE INTO actuator(element_addr, actuator_type, present_setpoint, "
             "target_setpoint, present_onoff, target_onoff, status, is_auto, threshold_src_addr, threshold_on, threshold_off, "
             "threshold_type, updated_at) "
             "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,COALESCE(NULLIF(?,0), unixepoch()))";
@@ -24,7 +24,7 @@ public:
             throw std::runtime_error(sqlite3_errmsg(database));
         }
 
-        sqlite3_bind_text(stmt, 1, a.node_id.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_int(stmt, 1, a.element_addr);
         sqlite3_bind_int(stmt, 2, a.actuator_type);
         sqlite3_bind_double(stmt, 3, a.present_setpoint);
         sqlite3_bind_double(stmt, 4, a.target_setpoint);
@@ -45,14 +45,14 @@ public:
         sqlite3_finalize(stmt);
     }
 
-    std::optional<Actuator> findByNodeId(const std::string& node_id) {
-        const char* sql = "SELECT * FROM actuator WHERE node_id=?";
+    std::optional<Actuator> findByElementAddr(int element_addr) {
+        const char* sql = "SELECT * FROM actuator WHERE element_addr=?";
         sqlite3_stmt* stmt = nullptr;
         if (sqlite3_prepare_v2(database, sql, -1, &stmt, nullptr) != SQLITE_OK) {
             throw std::runtime_error(sqlite3_errmsg(database));
         }
-        
-        sqlite3_bind_text(stmt, 1, node_id.c_str(), -1, SQLITE_TRANSIENT);
+
+        sqlite3_bind_int(stmt, 1, element_addr);
 
         std::optional<Actuator> res = std::nullopt;
         if (sqlite3_step(stmt) == SQLITE_ROW) {
@@ -75,15 +75,15 @@ public:
         return res;
     }
 
-    void deleteByNodeId(const std::string& node_id) {
-        const char* sql = "DELETE FROM actuator WHERE node_id=?";
+    void deleteByElementAddr(int element_addr) {
+        const char* sql = "DELETE FROM actuator WHERE element_addr=?";
         sqlite3_stmt* stmt = nullptr;
         if (sqlite3_prepare_v2(database, sql, -1, &stmt, nullptr) != SQLITE_OK) {
             throw std::runtime_error(sqlite3_errmsg(database));
         }
-        
-        sqlite3_bind_text(stmt, 1, node_id.c_str(), -1, SQLITE_TRANSIENT);
-        
+
+        sqlite3_bind_int(stmt, 1, element_addr);
+
         sqlite3_step(stmt);
         sqlite3_finalize(stmt);
     }
@@ -91,8 +91,7 @@ public:
 private:
     static Actuator row_to_actuator(sqlite3_stmt* stmt) {
         Actuator a;
-        const char* nid = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
-        a.node_id = nid ? nid : "";
+        a.element_addr = sqlite3_column_int(stmt, 0);
         a.actuator_type = sqlite3_column_int(stmt, 1);
         a.present_setpoint = sqlite3_column_double(stmt, 2);
         a.target_setpoint = sqlite3_column_double(stmt, 3);

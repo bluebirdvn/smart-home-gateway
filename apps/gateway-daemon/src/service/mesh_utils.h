@@ -21,23 +21,6 @@ namespace MeshUtils {
 		return v;
 	}
 
-	inline std::string node_id_from_unicast(const uint16_t unicast) {
-		std::ostringstream node_id;
-		node_id << "node_" << std::hex << std::setw(4) << std::setfill('0') << unicast;
-		return node_id.str();
-	}
-
-	inline uint16_t unicast_from_node_id(const std::string& node_id) {
-		if (node_id.rfind("node_", 0) == 0 && node_id.size() > 5) {
-			try {
-				return static_cast<uint16_t>(std::stoul(node_id.substr(5), nullptr, 16));
-			} catch (...) {
-				std::cout << "Failed to retrive unicast from node_id" << std::endl;
-			}
-		}
-		return 0;
-	}
-
 	inline std::string bytes_to_hex(const uint8_t *data, size_t len) {
 		std::ostringstream hex;
 		hex << std::hex << std::setfill('0');

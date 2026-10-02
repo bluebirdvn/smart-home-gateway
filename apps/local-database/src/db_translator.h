@@ -6,6 +6,7 @@
 #include "ipc_dto.h"
 #include "models.h"
 #include "repositories.h"
+#include "cjson_use.h"
 #include <map>
 #include <unordered_set>
 #include <iostream>
@@ -52,36 +53,47 @@ namespace sync_json {
     }
 
     inline std::string node_sync(std::shared_ptr<AppRepositories> repos) {
-        return "{\"nodes\":" + array<Node>(repos->node->findAll(), [](const Node& n) {
-            std::ostringstream o;
-            o << "{\"node_id\":\"" << jutil::esc(n.node_id) << "\",\"uuid\":\"" << jutil::esc(n.uuid)
-              << "\",\"name\":\"" << jutil::esc(n.name) << "\",\"kind\":\"" << jutil::esc(n.kind)
-              << "\",\"unicast\":" << n.unicast << ",\"element_addr\":" << n.element_addr
-              << ",\"model_id\":" << n.model_id << ",\"company_id\":" << n.company_id
-              << ",\"is_online\":" << (n.is_online ? 1 : 0) << "}";
-            return o.str();
-        }) + "}";
+        cJSON* root = cJSON_CreateObject();
+        cJSON* arr = cJSON_CreateArray();
+        
+        for (const auto& n : repos->node->findAll()) {
+            cJSON* obj = cJSON_CreateObject();
+            cJSON_AddNumberToObject(obj, "addr", n.element_addr);
+            cJSON_AddStringToObject(obj, "uuid", n.uuid.c_str());
+            cJSON_AddStringToObject(obj, "name", display_name(n).c_str());
+            cJSON_AddStringToObject(obj, "kind", n.kind.c_str());
+            cJSON_AddNumberToObject(obj, "unicast", n.unicast);
+            cJSON_AddNumberToObject(obj, "element_addr", n.element_addr);
+            cJSON_AddNumberToObject(obj, "model_id", n.model_id);
+            cJSON_AddNumberToObject(obj, "company_id", n.company_id);
+            cJSON_AddNumberToObject(obj, "nodeType", (n.kind == "sensor" ? 1 : (n.kind == "unknown" ? 0 : 2)));
+            cJSON_AddNumberToObject(obj, "devStatus", n.is_online ? 1 : 0);
+            cJSON_AddItemToArray(arr, obj);
+        }
+        
+        cJSON_AddItemToObject(root, "nodes", arr);
+        return JsonUse::to_string(root);
     }
 
     inline std::string group_sync(std::shared_ptr<AppRepositories> repos) {
-        return "{\"groups\":" + array<MeshGroup>(repos->group->findAll(), [repos](const MeshGroup& g) {
-            std::ostringstream o;
-            o << "{\"groupId\":" << g.group_id 
-              << ",\"meshGroupAddr\":" << g.group_addr
-              << ",\"groupName\":\"" << jutil::esc(g.name) << "\""
-              << ",\"isAutoMode\":" << (g.is_auto_mode ? "true" : "false")
-              << ",\"sensorType\":" << g.sensor_type
-              << ",\"thresholdOn\":" << g.threshold_on
-              << ",\"thresholdOff\":" << g.threshold_off;
+        cJSON* root = cJSON_CreateObject();
+        cJSON* arr = cJSON_CreateArray();
+
+        for (const auto& g : repos->group->findAll()) {
+            cJSON* obj = cJSON_CreateObject();
+            cJSON_AddNumberToObject(obj, "groupId", g.group_id);
+            cJSON_AddNumberToObject(obj, "meshGroupAddr", g.group_addr);
+            cJSON_AddStringToObject(obj, "groupName", g.name.c_str());
+            cJSON_AddBoolToObject(obj, "isAutoMode", g.is_auto_mode);
+            cJSON_AddNumberToObject(obj, "sensorType", g.sensor_type);
+            cJSON_AddNumberToObject(obj, "thresholdOn", g.threshold_on);
+            cJSON_AddNumberToObject(obj, "thresholdOff", g.threshold_off);
 
             auto members = repos->group_member->findByGroupId(g.group_id);
             std::vector<int64_t> s_ids, a_ids, sync_s_ids, sync_a_ids;
             
             for (const auto& m : members) {
-                int64_t addr = 0;
-                if (m.node_id.rfind("node_", 0) == 0) {
-                    addr = std::stoll(m.node_id.substr(5), nullptr, 16);
-                }
+                int64_t addr = m.element_addr;
                 if (m.role == "sensor") {
                     s_ids.push_back(addr);
                     if (m.mesh_applied == 1) sync_s_ids.push_back(addr);
@@ -91,44 +103,52 @@ namespace sync_json {
                 }
             }
 
-            auto vecToString = [](const std::vector<int64_t>& vec) {
-                std::ostringstream s; s << "[";
-                for (size_t i = 0; i < vec.size(); ++i) s << (i ? "," : "") << vec[i];
-                s << "]"; return s.str();
-            };
+            JsonUse::add_int_array(obj, "sensorNodeIds", s_ids);
+            JsonUse::add_int_array(obj, "actuatorNodeIds", a_ids);
+            JsonUse::add_int_array(obj, "syncedSensorIds", sync_s_ids);
+            JsonUse::add_int_array(obj, "syncedActuatorIds", sync_a_ids);
+            
+            cJSON_AddItemToArray(arr, obj);
+        }
 
-            o << ",\"sensorNodeIds\":" << vecToString(s_ids)
-              << ",\"actuatorNodeIds\":" << vecToString(a_ids)
-              << ",\"syncedSensorIds\":" << vecToString(sync_s_ids)
-              << ",\"syncedActuatorIds\":" << vecToString(sync_a_ids) << "}";
-            return o.str();
-        }) + "}";
+        cJSON_AddItemToObject(root, "groups", arr);
+        return JsonUse::to_string(root);
     }
 
     inline std::string sensor_sync(std::shared_ptr<AppRepositories> repos) {
-        return "{\"sensors\":" + array<SensorReading>(repos->sensor->findLatest(), [](const SensorReading& s) {
-            std::ostringstream o;
-            o << "{\"node_id\":\"" << jutil::esc(s.node_id) 
-              << "\",\"temperature\":" << s.temperature
-              << ",\"humidity\":" << s.humidity 
-              << ",\"soil_moisture\":" << s.soil_moisture 
-              << ",\"lux\":" << s.lux << ",\"motion\":" << s.motion
-              << ",\"battery\":" << s.battery << ",\"ts\":" << s.ts << "}";
-            return o.str();
-        }) + "}";
+        cJSON* root = cJSON_CreateObject();
+        cJSON* arr = cJSON_CreateArray();
+
+        for (const auto& s : repos->sensor->findLatest()) {
+            cJSON* obj = cJSON_CreateObject();
+            cJSON_AddNumberToObject(obj, "element_addr", s.element_addr);
+            cJSON_AddNumberToObject(obj, "temperature", s.temperature);
+            cJSON_AddNumberToObject(obj, "humidity", s.humidity);
+            cJSON_AddNumberToObject(obj, "soil_moisture", s.soil_moisture);
+            cJSON_AddNumberToObject(obj, "lux", s.lux);
+            cJSON_AddNumberToObject(obj, "motion", s.motion);
+            cJSON_AddNumberToObject(obj, "battery", s.battery);
+            cJSON_AddNumberToObject(obj, "ts", s.ts);
+            cJSON_AddItemToArray(arr, obj);
+        }
+
+        cJSON_AddItemToObject(root, "sensors", arr);
+        return JsonUse::to_string(root);
     }
 
     inline std::string sensor_one(const SensorReading& s) {
-        std::ostringstream o;
-        o << "{\"node_id\":\"" << jutil::esc(s.node_id) 
-        << "\",\"temperature\":" << s.temperature
-          << ",\"humidity\":" << s.humidity
-          << ",\"soil_moisture\":" << s.soil_moisture
-          << ",\"lux\":" << s.lux 
-          << ",\"motion\":" << s.motion
-          << ",\"battery\":" << s.battery << ",\"status\":1}";
-        return o.str();
+        cJSON* obj = cJSON_CreateObject();
+        cJSON_AddNumberToObject(obj, "element_addr", s.element_addr);
+        cJSON_AddNumberToObject(obj, "temperature", s.temperature);
+        cJSON_AddNumberToObject(obj, "humidity", s.humidity);
+        cJSON_AddNumberToObject(obj, "soil_moisture", s.soil_moisture);
+        cJSON_AddNumberToObject(obj, "lux", s.lux);
+        cJSON_AddNumberToObject(obj, "motion", s.motion);
+        cJSON_AddNumberToObject(obj, "battery", s.battery);
+        cJSON_AddNumberToObject(obj, "status", 1);
+        return JsonUse::to_string(obj);
     }
+    
 
     static std::string display_name(const Node& n) {
         if (!n.name.empty() && n.name.find("node_") != 0 && n.name != "unknown") {
@@ -157,22 +177,20 @@ public:
         return [repos, ipc](const IpcMessage&) {
             if (!ipc) return;
             try {
-                auto all_nodes = repos->node->findAll();
-                for (const auto& n : all_nodes) {
-                    std::ostringstream o;
-                    o << "{"
-                      << "\"node_id\":\"" << jutil::esc(n.node_id) << "\","
-                      << "\"name\":\"" << jutil::esc(sync_json::display_name(n)) << "\","
-                      << "\"uuid\":\"" << jutil::esc(n.uuid) << "\","
-                      << "\"unicast\":" << n.unicast << ","
-                      << "\"element_addr\":" << n.element_addr << ","
-                      << "\"model_id\":" << n.model_id << ","
-                      << "\"company_id\":" << n.company_id << ","
-                      << "\"nodeType\":" << (n.kind == "sensor" ? 1 : (n.kind == "unknown" ? 0 : 2)) << ","
-                      << "\"devStatus\":" << (n.is_online ? 1 : 0)
-                      << "}";
-                      
-                    ipc->publish("NodeSyncEvent", IpcMessage{o.str()});
+                std::cout << "Syncing all nodes...\n";
+                for (const auto& n : repos->node->findAll()) {
+                    cJSON* obj = cJSON_CreateObject();
+                    cJSON_AddNumberToObject(obj, "addr", n.element_addr);
+                    cJSON_AddStringToObject(obj, "name", sync_json::display_name(n).c_str());
+                    cJSON_AddStringToObject(obj, "uuid", n.uuid.c_str());
+                    cJSON_AddNumberToObject(obj, "unicast", n.unicast);
+                    cJSON_AddNumberToObject(obj, "element_addr", n.element_addr);
+                    cJSON_AddNumberToObject(obj, "model_id", n.model_id);
+                    cJSON_AddNumberToObject(obj, "company_id", n.company_id);
+                    cJSON_AddNumberToObject(obj, "nodeType", (n.kind == "sensor" ? 1 : (n.kind == "unknown" ? 0 : 2)));
+                    cJSON_AddNumberToObject(obj, "devStatus", n.is_online ? 1 : 0);
+                    
+                    ipc->publish("NodeSyncEvent", IpcMessage{JsonUse::to_string(obj)});
                 }
             } catch (const std::exception& e) {
                 std::cerr << "[DB] SyncAllNodes error: " << e.what() << "\n";
@@ -183,11 +201,17 @@ public:
     static EventCallback make_mesh_group_status_handler(std::shared_ptr<AppRepositories> repos, IIpc* ipc) {
         return [repos, ipc](const IpcMessage& msg) {
             try {
+
                 auto dto = GroupOpDto::from_json(msg.payload);
-                
+                std::cout << "GroupStatus src=0x" << std::hex << dto.element_addr << " group=0x" << std::hex << dto.group_addr 
+                          << " elem=0x" << std::hex << dto.element_addr 
+                          << " model=0x" << std::hex << dto.model_id 
+                          << " is_sub=" << std::dec << (int)dto.is_sub 
+                          << " is_add=" << std::dec << (int)dto.is_add 
+                          << " success=" << std::dec << (int)dto.success
+                          << "\n";
                 if (!dto.success) {
-                    std::cerr << "[DB] Group config FAILED for element: 0x" 
-                              << std::hex << dto.element_addr << std::dec << "\n";
+                    std::cerr << "[DB] Group config FAILED for element: 0x" << std::hex << dto.element_addr << std::dec << "\n";
                     return; 
                 }
 
@@ -204,7 +228,7 @@ public:
                     char idbuf[32];
                     std::snprintf(idbuf, sizeof(idbuf), "node_%04X", dto.element_addr);
                     
-                    auto member_opt = repos->group_member->findByGroupAndNode(target_group_id, idbuf);
+                    auto member_opt = repos->group_member->findByGroupAndElementAddr(target_group_id, dto.element_addr);
                     
                     if (dto.is_add) {
                         if (member_opt) {
@@ -235,14 +259,15 @@ public:
     static EventCallback make_mesh_sensor_handler(std::shared_ptr<AppRepositories> repos, IIpc* ipc) {
         return [repos, ipc](const IpcMessage& msg) {
             try {
+                std::cout << "Received SensorData: " << msg.payload << "\n";
                 auto dto = SensorDto::from_json(msg.payload);
                 
-                if (dto.node_id.empty() || !repos->node->findById(dto.node_id)) {
+                if (dto.element_addr == 0 || !repos->node->findByElementAddr(dto.element_addr)) {
                     return; 
                 }
 
                 SensorReading s;
-                s.node_id = dto.node_id;
+                s.element_addr = dto.element_addr;
                 s.temperature = dto.temperature;
                 s.soil_moisture = dto.soil_moisture;
                 s.humidity = dto.humidity;
@@ -265,17 +290,18 @@ public:
     static EventCallback make_mesh_actuator_status_handler(std::shared_ptr<AppRepositories> repos, IIpc* ipc) {
         return [repos, ipc](const IpcMessage& msg) {
             try {
+                std::cout << "Received ActuatorStatus: " << msg.payload << "\n";
                 auto dto = ActuatorStatusDto::from_json(msg.payload);
-                if (dto.node_id.empty() || !repos->node->findById(dto.node_id)) {
+                if (dto.element_addr == 0 || !repos->node->findByElementAddr(dto.element_addr)) {
                     return;
                 }
 
                 Actuator a;
-                if (auto cur = repos->actuator->findByNodeId(dto.node_id)) {
+                if (auto cur = repos->actuator->findByElementAddr(dto.element_addr)) {
                     a = *cur;
                 }
                 
-                a.node_id = dto.node_id;
+                a.element_addr = dto.element_addr;
                 a.actuator_type = dto.actuator_type;
                 a.present_setpoint = dto.present_setpoint;
                 a.status = dto.status;
@@ -293,8 +319,9 @@ public:
     static EventCallback make_mesh_heartbeat_handler(std::shared_ptr<AppRepositories> repos, IIpc* ipc) {
         return [repos, ipc](const IpcMessage& msg) {
             try {
+                std::cout << "Received Heartbeat: " << msg.payload << "\n";
                 auto dto = HeartbeatDto::from_json(msg.payload);
-                repos->node->updateStatus(dto.node_id, dto.is_online ? 1 : 0, static_cast<int64_t>(time(nullptr)));
+                repos->node->updateStatus(dto.unicast, dto.is_online ? 1 : 0, static_cast<int64_t>(time(nullptr)));
                 
                 if (ipc) {
                     ipc->publish("HeartbeatEvent", msg);
@@ -308,14 +335,15 @@ public:
     static EventCallback make_ui_actuator_cmd_handler(std::shared_ptr<AppRepositories> repos, IIpc* ipc) {
         return [repos, ipc](const IpcMessage& msg) {
             try {
+                std::cout << "Received ActuatorCmd: " << msg.payload << "\n";
                 auto dto = ActuatorCmdDto::from_json(msg.payload);
                 
-                if (repos->node->findById(dto.node_id)) {
+                if (repos->node->findByElementAddr(dto.element_addr)) {
                     Actuator a;
-                    if (auto cur = repos->actuator->findByNodeId(dto.node_id)) {
+                    if (auto cur = repos->actuator->findByElementAddr(dto.element_addr)) {
                         a = *cur;
                     }
-                    a.node_id = dto.node_id;
+                    a.element_addr = dto.element_addr;
                     a.actuator_type = dto.device_type;
                     a.target_setpoint = dto.setpoint;
                     a.target_onoff = dto.onoff ? 1 : 0;
@@ -331,13 +359,14 @@ public:
     static EventCallback make_ui_auto_mode_handler(std::shared_ptr<AppRepositories> repos, IIpc* ipc) {
         return [repos, ipc](const IpcMessage& msg) {
             try {
+                std::cout << "Received AutoModeCmd: " << msg.payload << "\n";
                 auto dto = ModeAutoDto::from_json(msg.payload);
-                if (repos->node->findById(dto.node_id)) {
+                if (repos->node->findByElementAddr(dto.element_addr)) {
                     Actuator a;
-                    if (auto cur = repos->actuator->findByNodeId(dto.node_id)) {
+                    if (auto cur = repos->actuator->findByElementAddr(dto.element_addr)) {
                         a = *cur;
                     }
-                    a.node_id = dto.node_id;
+                    a.element_addr = dto.element_addr;
                     a.is_auto = dto.is_auto ? 1 : 0;
                     repos->actuator->upsert(a);
                 }
@@ -351,13 +380,14 @@ public:
     static EventCallback make_ui_threshold_cmd_handler(std::shared_ptr<AppRepositories> repos, IIpc* ipc) {
         return [repos, ipc](const IpcMessage& msg) {
             try {
+                std::cout << "Received ThresholdConfigCmd: " << msg.payload << "\n";
                 auto dto = ThresholdCmdDto::from_json(msg.payload);
-                if (repos->node->findById(dto.node_id)) {
+                if (repos->node->findByElementAddr(dto.element_addr)) {
                     Actuator a;
-                    if (auto cur = repos->actuator->findByNodeId(dto.node_id)) {
+                    if (auto cur = repos->actuator->findByElementAddr(dto.element_addr)) {
                         a = *cur;
                     }
-                    a.node_id = dto.node_id;
+                    a.element_addr = dto.element_addr;
                     a.threshold_src_addr = dto.src_addr;
                     a.threshold_on = dto.threshold_on;
                     a.threshold_off = dto.threshold_off;
@@ -374,8 +404,9 @@ public:
     static EventCallback make_ui_delete_node_handler(std::shared_ptr<AppRepositories> repos, IIpc* ipc) {
         return [repos, ipc](const IpcMessage& msg) {
             try {
+                std::cout << "Received DeleteNodeCmd: " << msg.payload << "\n";
                 auto dto = DeleteNodeDto::from_json(msg.payload);
-                repos->node->deleteById(dto.node_id);
+                repos->node->deleteByUnicast(dto.unicast);
                 
                 if (ipc) {
                     make_ui_sync_all_nodes_handler(repos, ipc)(IpcMessage{});
@@ -389,6 +420,7 @@ public:
 
     static EventCallback make_ui_request_sync_handler(std::shared_ptr<AppRepositories> repos, IIpc* ipc) {
         return [repos, ipc](const IpcMessage&) {
+            std::cout << "Received RequestSyncCmd\n";
             if (!ipc) {
                 return;
             }
@@ -401,6 +433,7 @@ public:
 
     static EventCallback make_ui_create_group_handler(std::shared_ptr<AppRepositories> repos, IIpc* ipc) {
         return [repos, ipc](const IpcMessage& msg) {
+            std::cout << "Received CreateGroupCmd: " << msg.payload << "\n";
             try {
                 auto dto = GroupGetAddrDto::from_json(msg.payload);
 
@@ -432,8 +465,9 @@ public:
         };
     }
 
-        static EventCallback make_ui_update_group_handler(std::shared_ptr<AppRepositories> repos, IIpc* ipc) {
+    static EventCallback make_ui_update_group_handler(std::shared_ptr<AppRepositories> repos, IIpc* ipc) {
         return [repos, ipc](const IpcMessage& msg) {
+            std::cout << "Received UpdateGroupCmd: " << msg.payload << "\n";
             try {
                 auto dto = AutomationRuleDto::from_json(msg.payload); 
 
@@ -442,74 +476,82 @@ public:
                 if (auto cur = repos->group->findById(dto.groupId)) {
                     g = *cur; is_new_group = false;
                 } else {
-                    g.group_id = dto.groupId; g.group_addr = dto.meshGroupAddr;
+                    g.group_id = dto.groupId; 
+                    g.group_addr = dto.meshGroupAddr;
                 }
-                g.name = dto.groupName; g.is_auto_mode = dto.isAutoMode ? 1 : 0;
-                g.sensor_type = dto.sensorType; g.threshold_on = dto.thresholdOn; g.threshold_off = dto.thresholdOff;
-                if (is_new_group) repos->group->insert(g); else repos->group->update(g);
+                g.name = dto.groupName; 
+                g.is_auto_mode = dto.isAutoMode ? 1 : 0;
+                g.sensor_type = dto.sensorType; 
+                g.threshold_on = dto.thresholdOn; 
+                g.threshold_off = dto.thresholdOff;
+                if (is_new_group) repos->group->insert(g); 
+                else repos->group->update(g);
 
-                std::map<std::string, MeshGroupMember> old_members;
+                std::map<int, MeshGroupMember> old_members;
                 auto existing_members = repos->group_member->findByGroupId(dto.groupId);
                 for (const auto& m : existing_members) {
-                    old_members[m.node_id] = m;
+                    old_members[m.element_addr] = m;
                 }
 
                 repos->group_member->deleteAllInGroup(dto.groupId);
 
                 for (int64_t sensor_elem_addr : dto.sensorNodeIds) {
-                    char idbuf[32]; std::snprintf(idbuf, sizeof(idbuf), "node_%04X", static_cast<uint16_t>(sensor_elem_addr));
+                    int e_addr = static_cast<int>(sensor_elem_addr);
                     MeshGroupMember member;
                     member.group_id = dto.groupId; 
-                    member.node_id = idbuf; 
+                    member.element_addr = e_addr; 
                     member.role = "sensor"; 
                     member.mesh_applied = 0;
                     
-                    if (old_members.count(idbuf) && old_members[idbuf].role == "sensor" && old_members[idbuf].mesh_applied == 1) {
+                    if (old_members.count(e_addr) && old_members[e_addr].role == "sensor" && old_members[e_addr].mesh_applied == 1) {
                         member.mesh_applied = 1; 
                     } else if (ipc) {
-                        if (auto optNode = repos->node->findById(idbuf)) {
+                        if (auto optNode = repos->node->findByElementAddr(e_addr)) {
                             PublishGroupDto pubDto;
-                            pubDto.node_id = optNode->node_id; 
+                            pubDto.addr = optNode->element_addr; 
                             pubDto.element_addr = optNode->element_addr;     
                             pubDto.group_addr = dto.meshGroupAddr; 
                             pubDto.model_id = optNode->model_id; 
                             pubDto.company_id = optNode->company_id;
-                            pubDto.pub_ttl = 5; pubDto.pub_period = 0;                  
+                            pubDto.pub_ttl = 5; 
+                            pubDto.pub_period = 0;                  
                             ipc->publish("GroupPublishAddCmd", IpcMessage{pubDto.to_json()});
                         }
                     }
                     repos->group_member->upsert(member); 
-                    old_members.erase(idbuf);
+                    old_members.erase(e_addr);
                 }
 
                 if (ipc) {
                     for (int64_t actuator_elem_addr : dto.actuatorNodeIds) {
-                        char idbuf[32]; 
-                        std::snprintf(idbuf, sizeof(idbuf), "node_%04X", static_cast<uint16_t>(actuator_elem_addr));
+                        int e_addr = static_cast<int>(actuator_elem_addr);
                         
-                        if (auto optNode = repos->node->findById(idbuf)) {
+                        if (auto optNode = repos->node->findByElementAddr(e_addr)) {
                             uint8_t a_type = 0;
-                            if (auto curAct = repos->actuator->findByNodeId(idbuf)) {
+                            if (auto curAct = repos->actuator->findByElementAddr(e_addr)) {
                                 a_type = static_cast<uint8_t>(curAct->actuator_type);
                             } else {
-                                if (optNode->model_id == VND_MODEL_ID_ACTUATOR_AC) a_type = 3;
-                                else if (optNode->model_id == VND_MODEL_ID_ACTUATOR_LIGHT) a_type = 4;
-                                else if (optNode->model_id == VND_MODEL_ID_ACTUATOR_RELAY) a_type = 5;
+                                if (optNode->model_id == VND_MODEL_ID_ACTUATOR_AC){
+                                     a_type = 1;
+                                } else if (optNode->model_id == VND_MODEL_ID_ACTUATOR_LIGHT) {
+                                    a_type = 2;
+                                } else if (optNode->model_id == VND_MODEL_ID_ACTUATOR_RELAY) {
+                                    a_type = 3;
+                                }
                             }
 
                             ThresholdCmdDto threshDto;
-                            threshDto.node_id = idbuf;
                             threshDto.element_addr = optNode->element_addr; 
                             threshDto.actuator_type = a_type; 
                             threshDto.src_addr = dto.meshGroupAddr; 
-                            
                             threshDto.threshold_on = dto.thresholdOn;
                             threshDto.threshold_off = dto.thresholdOff;
                             threshDto.threshold_type = dto.sensorType; 
 
                             ipc->publish("MeshCmdThresholdConfig", IpcMessage{threshDto.to_json()});
+                            
                             SubscribeGroupDto subDto;
-                            subDto.node_id = optNode->node_id; 
+                            subDto.addr = optNode->element_addr; 
                             subDto.element_addr = optNode->element_addr;     
                             subDto.group_addr = dto.meshGroupAddr; 
                             subDto.model_id = optNode->model_id; 
@@ -518,31 +560,29 @@ public:
                             
                             MeshGroupMember member;
                             member.group_id = dto.groupId; 
-                            member.node_id = idbuf; 
+                            member.element_addr = e_addr; 
                             member.role = "actuator"; 
                             member.mesh_applied = 0; 
-                            if (old_members.count(idbuf) && old_members[idbuf].role == "actuator" && old_members[idbuf].mesh_applied == 1) {
+                            if (old_members.count(e_addr) && old_members[e_addr].role == "actuator" && old_members[e_addr].mesh_applied == 1) {
                                 member.mesh_applied = 1;
                             }
                             repos->group_member->upsert(member);
-                            old_members.erase(idbuf);
+                            old_members.erase(e_addr);
 
                             ModeAutoDto m;
-                            m.node_id = idbuf;
                             m.element_addr = optNode->element_addr;
                             m.actuator_type = a_type;
                             m.is_auto = dto.isAutoMode;
                             ipc->publish("MeshCmdAutoMode", IpcMessage{m.to_json()});
-
                         }
                     }
                 }
 
-                for (const auto& [node_id_str, old_m] : old_members) {
+                for (const auto& [e_addr, old_m] : old_members) {
                     if (ipc) {
-                        if (auto optNode = repos->node->findById(node_id_str)) {
+                        if (auto optNode = repos->node->findByElementAddr(e_addr)) {
                             GroupDeleteDto delDto;
-                            delDto.node_id = optNode->node_id;
+                            delDto.addr = optNode->element_addr;
                             delDto.element_addr = optNode->element_addr;
                             delDto.group_addr = dto.meshGroupAddr;
                             delDto.model_id = optNode->model_id;
@@ -569,15 +609,16 @@ public:
 
     static EventCallback make_ui_delete_group_handler(std::shared_ptr<AppRepositories> repos, IIpc* ipc) {
         return [repos, ipc](const IpcMessage& msg) {
+            std::cout << "Received DeleteGroupCmd: " << msg.payload << "\n";
             try {
                 int groupId = jutil::get_int(msg.payload, "groupId");
                 
                 if (auto group_info = repos->group->findById(groupId)) {
                     auto existing_members = repos->group_member->findByGroupId(groupId);
                     for (const auto& m : existing_members) {
-                        if (auto n = repos->node->findById(m.node_id)) {
+                        if (auto n = repos->node->findByElementAddr(m.element_addr)) {
                             GroupDeleteDto delDto;
-                            delDto.node_id = n->node_id;
+                            delDto.addr = n->element_addr;
                             delDto.element_addr = n->element_addr;
                             delDto.group_addr = group_info->group_addr;
                             delDto.model_id = n->model_id;
@@ -609,6 +650,7 @@ public:
 
     static EventCallback make_ui_request_sync_groups_handler(std::shared_ptr<AppRepositories> repos, IIpc* ipc) {
         return [repos, ipc](const IpcMessage&) {
+            std::cout << "Received RequestSyncGroupsCmd\n";
             if (!ipc) {
                 return;
             }
@@ -617,26 +659,16 @@ public:
     }
     static EventCallback make_mesh_node_info_handler(std::shared_ptr<AppRepositories> repos, IIpc* ipc) {
         return [repos, ipc](const IpcMessage& msg) {
+            std::cout << "Received NodeInfo: " << msg.payload << "\n";
             try {
                 auto dto = NodeInfoDto::from_json(msg.payload);
-                
-                char idbuf[32];
-                std::snprintf(idbuf, sizeof(idbuf), "node_%04X", dto.element_addr);
-                std::string node_id_str = idbuf;
-
-                std::ostringstream uuid_hex;
-                uuid_hex << std::hex << std::setfill('0');
-                for (int i = 0; i < 16; ++i) { 
-                    uuid_hex << std::setw(2) << static_cast<unsigned int>(dto.uuid[i]); 
-                }
-                std::string uuid_str = dto.uuid;
-
+            
                 Node n;
-                if (auto cur = repos->node->findById(node_id_str)) {
+                if (auto cur = repos->node->findByElementAddr(dto.element_addr)) {
                     n = *cur;
                 } else {
-                    n.node_id = node_id_str;
-                    
+                    n.element_addr = dto.element_addr;
+
                     if (dto.model_id == VND_MODEL_ID_SENSOR) { 
                         n.kind = "sensor";
                     } else if (dto.model_id == VND_MODEL_ID_ACTUATOR) {
@@ -673,7 +705,7 @@ public:
                     }
                 }
 
-                n.uuid = uuid_str;
+                n.uuid = dto.uuid;
                 n.unicast = dto.unicast; 
                 n.element_addr = dto.element_addr;
                 n.elem_num = dto.element_num;

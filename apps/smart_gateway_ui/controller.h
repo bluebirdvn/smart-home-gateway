@@ -62,20 +62,20 @@ public:
     /**
      * @brief Set the Actuator Manual object (switch between auto and manual)
      * 
-     * @param nodeId 
+     * @param addr 
      * @param deviceType 
      * @param state 
      * @return Q_INVOKABLE 
      */
-    Q_INVOKABLE void setActuatorManual(const QString &nodeId, int deviceType, bool state);
+    Q_INVOKABLE void setActuatorManual(const uint16_t &addr, bool state);
 
     /**
      * @brief delete a node from network
      * 
-     * @param nodeId 
+     * @param addr 
      * @return Q_INVOKABLE 
      */
-    Q_INVOKABLE void removeNode(const QString &nodeId);             
+    Q_INVOKABLE void removeNode(const uint16_t &addr);             
 
     /**
      * @brief Create a New Group object
@@ -138,24 +138,24 @@ public:
     /**
      * @brief Set the Ac Manual object
      * 
-     * @param nodeId 
+     * @param addr 
      * @param power 
      * @param mode 
      * @param fan 
      * @param temp 
      * @return Q_INVOKABLE 
      */
-    Q_INVOKABLE void setAcManual(const QString &nodeId, bool power, int mode, int fan, int temp);
+    Q_INVOKABLE void setAcManual(const uint16_t &addr, bool power, int mode, int fan, int temp);
 
     /**
      * @brief Set the Light Manual object
      * 
-     * @param nodeId 
+     * @param addr 
      * @param on 
      * @param brightness 
      * @return Q_INVOKABLE 
      */
-    Q_INVOKABLE void setLightManual(const QString &nodeId, bool on, int brightness);
+    Q_INVOKABLE void setLightManual(const uint16_t &addr, bool on, int brightness);
 
     /**
      * @brief Get the Automation Groups object: convert to a qvariantlist for qml

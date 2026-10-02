@@ -1,4 +1,3 @@
-
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -61,6 +60,7 @@ Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
 
+            // ---------------- Group list ----------------
             Item {
                 ColumnLayout {
                     anchors.fill: parent
@@ -83,6 +83,11 @@ Item {
                         model: GatewayController.automationGroups
 
                         delegate: Rectangle {
+                            id: groupRow
+                            readonly property bool pending:
+                                modelData.syncedSensors.length   !== modelData.sensors.length ||
+                                modelData.syncedActuators.length !== modelData.actuators.length
+
                             width: ListView.view.width
                             height: 58
                             color: "#FFFFFF"
@@ -132,10 +137,10 @@ Item {
                                     spacing: 4
                                     Text {
                                         text: "S:" + modelData.sensors.length + " A:" + modelData.actuators.length
-                                              + "  sync " + modelData.syncedSensors.length + "/" + modelData.sensors.length
-                                              + ", " + modelData.syncedActuators.length + "/" + modelData.actuators.length
-                                        color: (modelData.syncedSensors.length === modelData.sensors.length &&
-                                                modelData.syncedActuators.length === modelData.actuators.length) ? "#2E7D32" : "#EF6C00"
+                                              + (groupRow.pending ? "  pending " : "  synced ")
+                                              + modelData.syncedSensors.length + "/" + modelData.sensors.length + ", "
+                                              + modelData.syncedActuators.length + "/" + modelData.actuators.length
+                                        color: groupRow.pending ? "#EF6C00" : "#2E7D32"
                                         font.pixelSize: 8
                                         elide: Text.ElideRight
                                         Layout.fillWidth: true
@@ -145,6 +150,7 @@ Item {
                                         color: modelData.isAutoMode ? "#2E7D32" : "#EF6C00"
                                         font.bold: true; font.pixelSize: 9
                                     }
+                                    // AUTO/MAN needs no device feedback: applied immediately
                                     MySwitch {
                                         checked: modelData.isAutoMode
                                         onToggled: GatewayController.setGroupMode(modelData.groupId, checked)
@@ -187,7 +193,7 @@ Item {
                                     Layout.fillWidth: true
                                     spacing: 0
                                     Text {
-                                        text: model.devName + " (ID: " + model.nodeId + ")"
+                                        text: model.devName
                                         color: "#263238"; font.bold: true; font.pixelSize: 10
                                         elide: Text.ElideRight; Layout.fillWidth: true
                                     }
@@ -201,7 +207,7 @@ Item {
                                     text: "Delete"
                                     baseColor: "#C62828"; textColor: "white"
                                     implicitHeight: 26
-                                    onClicked: GatewayController.removeNode(model.nodeId)
+                                    onClicked: GatewayController.removeNode(model.devAddrNum)
                                 }
                             }
                         }
@@ -378,7 +384,7 @@ Item {
                         Repeater {
                             model: settingTabRoot.currentGroup ? settingTabRoot.currentGroup.sensors : []
                             delegate: ChipItem {
-                                nodeText: "Node " + modelData
+                                nodeText: MyDevice.nameByAddr(modelData)
                                 synced: settingTabRoot.currentGroup
                                     ? settingTabRoot.currentGroup.syncedSensors.indexOf(modelData) !== -1
                                     : false
@@ -405,7 +411,7 @@ Item {
                         Repeater {
                             model: settingTabRoot.currentGroup ? settingTabRoot.currentGroup.actuators : []
                             delegate: ChipItem {
-                                nodeText: "Node " + modelData
+                                nodeText: MyDevice.nameByAddr(modelData)
                                 synced: settingTabRoot.currentGroup
                                     ? settingTabRoot.currentGroup.syncedActuators.indexOf(modelData) !== -1
                                     : false
@@ -433,14 +439,18 @@ Item {
                         implicitHeight: 30
                         Layout.fillWidth: true
                         onClicked: {
-                            GatewayController.applyMeshPubSubConfig(
-                                settingTabRoot.editingGroupId,
-                                txtEditName.text,
-                                parseFloat(txtEditOn.text),
-                                parseFloat(txtEditOff.text),
-                                settingTabRoot.currentGroup.isAutoMode,
-                                cbSensorType.currentIndex
-                            )
+                            var g = settingTabRoot.currentGroup
+                            if (g) {
+                                GatewayController.applyMeshPubSubConfig(
+                                    settingTabRoot.editingGroupId,
+                                    txtEditName.text,
+                                    parseFloat(txtEditOn.text),
+                                    parseFloat(txtEditOff.text),
+                                    g.isAutoMode,
+                                    cbSensorType.currentIndex
+                                )
+                            }
+                            // The group row shows "pending" until the mesh confirms every member
                             configGroupPopup.close()
                         }
                     }
@@ -542,7 +552,7 @@ Item {
 
                 contentItem: Text {
                     leftPadding: 10
-                    text: model.devName + " (ID: " + model.nodeId + ")"
+                    text: model.devName + " (" + model.devAddr + ")"
                     color: "#263238"
                     font.pixelSize: 10
                     verticalAlignment: Text.AlignVCenter
@@ -554,8 +564,7 @@ Item {
                 }
 
                 onClicked: {
-                    var addr = parseInt(model.devAddr, 16)
-                    GatewayController.addDeviceToGroup(settingTabRoot.editingGroupId, addr, devPicker.forSensor)
+                    GatewayController.addDeviceToGroup(settingTabRoot.editingGroupId, model.devAddrNum, devPicker.forSensor)
                     devPicker.close()
                 }
             }

@@ -43,10 +43,10 @@ void Network::onHeartbeat(const MeshFrame& f)
         return;
     }
 
-    std::cout << "[Net] Heartbeat src=0x" << std::hex << f.addr << " hops=" << std::dec << (int)p->hops << " feat=0x" << std::hex << p->features << "\n";
+    std::cout << "Heartbeat src=0x" << std::hex << f.addr << " hops=" << std::dec << (int)p->hops << " feat=0x" << std::hex << p->features << "\n";
 
     HeartbeatDto s;
-    s.node_id = MeshUtils::node_id_from_unicast(f.addr);
+    s.unicast = f.addr;
     s.is_online = true;
     s.features = static_cast<int32_t>(p->features);
     ipc->publish("HeartbeatEvent", dto_to_ipc(s));

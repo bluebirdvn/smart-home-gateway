@@ -39,10 +39,10 @@ struct AutomationRuleDto {
     uint16_t meshGroupAddr = 0;
     QString groupName = "";
     bool isAutoMode = true; 
-    QSet<int> sensorNodeIds;
-    QSet<int> actuatorNodeIds;
-    QSet<int> syncedSensorIds;
-    QSet<int> syncedActuatorIds;
+    QSet<uint16_t> sensorAddrs;
+    QSet<uint16_t> actuatorAddrs;
+    QSet<uint16_t> syncedSensorAddrs;
+    QSet<uint16_t> syncedActuatorAddrs;
     int sensorType = 0;
     double thresholdOn = 0.0;
     double thresholdOff = 0.0;
@@ -57,16 +57,16 @@ struct AutomationRuleDto {
         obj["thresholdOn"] = thresholdOn;
         obj["thresholdOff"] = thresholdOff;
 
-        auto setToArray = [](const QSet<int>& set) {
+        auto setToArray = [](const QSet<uint16_t>& set) {
             QJsonArray arr;
-            for (int val : set) arr.append(val);
+            for (uint16_t val : set) arr.append(val);
             return arr;
         };
 
-        obj["sensorNodeIds"] = setToArray(sensorNodeIds);
-        obj["actuatorNodeIds"] = setToArray(actuatorNodeIds);
-        obj["syncedSensorIds"] = setToArray(syncedSensorIds);
-        obj["syncedActuatorIds"] = setToArray(syncedActuatorIds);
+        obj["sensorAddrs"] = setToArray(sensorAddrs);
+        obj["actuatorAddrs"] = setToArray(actuatorAddrs);
+        obj["syncedSensorAddrs"] = setToArray(syncedSensorAddrs);
+        obj["syncedActuatorAddrs"] = setToArray(syncedActuatorAddrs);
         
         return QJsonDocument(obj).toJson(QJsonDocument::Compact);
     }
@@ -82,15 +82,15 @@ struct AutomationRuleDto {
         d.thresholdOff = obj["thresholdOff"].toDouble();
 
         auto arrayToSet = [](const QJsonArray& arr) {
-            QSet<int> set;
-            for (const auto& val : arr) set.insert(val.toInt());
+            QSet<uint16_t> set;
+            for (const auto& val : arr) set.insert(static_cast<uint16_t>(val.toInt()));
             return set;
         };
 
-        d.sensorNodeIds = arrayToSet(obj["sensorNodeIds"].toArray());
-        d.actuatorNodeIds = arrayToSet(obj["actuatorNodeIds"].toArray());
-        d.syncedSensorIds = arrayToSet(obj["syncedSensorIds"].toArray());
-        d.syncedActuatorIds = arrayToSet(obj["syncedActuatorIds"].toArray());
+        d.sensorAddrs = arrayToSet(obj["sensorAddrs"].toArray());
+        d.actuatorAddrs = arrayToSet(obj["actuatorAddrs"].toArray());
+        d.syncedSensorAddrs = arrayToSet(obj["syncedSensorAddrs"].toArray());
+        d.syncedActuatorAddrs = arrayToSet(obj["syncedActuatorAddrs"].toArray());
         
         return d;
     }
@@ -150,14 +150,12 @@ struct UnprovAdvDto {
 };
 
 struct ModeAutoDto {
-    QString node_id;
     uint8_t actuator_type = 0;
     uint16_t element_addr = 0;
     bool is_auto = false;
     
     QString to_json() const {
         QJsonObject obj;
-        obj["node_id"] = node_id; 
         obj["actuator_type"] = actuator_type;
         obj["element_addr"] = element_addr; 
         obj["is_auto"] = is_auto; 
@@ -166,9 +164,8 @@ struct ModeAutoDto {
     static ModeAutoDto from_json(const QString& j) {
         ModeAutoDto t;
         QJsonObject obj = QJsonDocument::fromJson(j.toUtf8()).object();
-        t.node_id = obj["node_id"].toString();
         t.actuator_type = static_cast<uint8_t>(obj["actuator_type"].toInt());
-        t.element_addr = obj["element_addr"].toInt();
+        t.element_addr = static_cast<uint16_t>(obj["element_addr"].toInt());
         t.is_auto = obj["is_auto"].toBool();
         return t;
     }
@@ -176,7 +173,7 @@ struct ModeAutoDto {
 };
 
 struct NodeInfoDto {
-    QString node_id;
+    uint16_t addr;
     QString name;
     QString uuid;
     uint16_t net_idx = 0;
@@ -190,7 +187,7 @@ struct NodeInfoDto {
 
     QString to_json() const {
         QJsonObject obj;
-        obj["node_id"] = node_id;
+        obj["addr"] = addr;
         obj["name"] = name;
         obj["uuid"] = uuid;
         obj["net_idx"] = net_idx;
@@ -207,7 +204,7 @@ struct NodeInfoDto {
     static NodeInfoDto from_json(const QString& j) {
         NodeInfoDto d;
         QJsonObject obj = QJsonDocument::fromJson(j.toUtf8()).object();
-        d.node_id      = obj["node_id"].toString();
+        d.addr      = static_cast<uint16_t>(obj["addr"].toInt());
         d.name         = obj["name"].toString();
         d.uuid         = obj["uuid"].toString();
         d.net_idx      = static_cast<uint16_t>(obj["net_idx"].toInt());
@@ -224,7 +221,6 @@ struct NodeInfoDto {
 };
 
 struct SensorDto {
-    QString node_id;
     int32_t element_addr = 0;
     double  temperature  = 0.0;
     double  humidity     = 0.0;
@@ -236,7 +232,6 @@ struct SensorDto {
 
     QString to_json() const {
         QJsonObject obj;
-        obj["node_id"] = node_id; 
         obj["element_addr"] = element_addr;
         obj["temperature"] = temperature; 
         obj["humidity"] = humidity;
@@ -250,22 +245,20 @@ struct SensorDto {
     static SensorDto from_json(const QString& j) {
         SensorDto s;
         QJsonObject obj = QJsonDocument::fromJson(j.toUtf8()).object();
-        s.node_id = obj["node_id"].toString();
-        s.element_addr = obj["element_addr"].toInt();
+        s.element_addr = static_cast<uint16_t>(obj["element_addr"].toInt());
         s.temperature = obj["temperature"].toDouble();
         s.humidity = obj["humidity"].toDouble();
         s.lux = obj["lux"].toDouble();
         s.soil_moisture = obj["soil_moisture"].toDouble(); 
-        s.motion = obj["motion"].toInt();
-        s.battery = obj["battery"].toInt();
-        s.status = obj["status"].toInt();
+        s.motion = static_cast<uint16_t>(obj["motion"].toInt());
+        s.battery = static_cast<uint16_t>(obj["battery"].toInt());
+        s.status = static_cast<uint16_t>(obj["status"].toInt());
         return s;
     }
     IPC_FROM_JSON(SensorDto)
 };
 
 struct ThresholdCmdDto {
-    QString node_id;
     uint8_t actuator_type = 0;
     int32_t element_addr  = 0;
     int32_t src_addr      = 0;
@@ -275,7 +268,6 @@ struct ThresholdCmdDto {
 
     QString to_json() const {
         QJsonObject obj;
-        obj["node_id"] = node_id; 
         obj["actuator_type"] = actuator_type;
         obj["element_addr"] = element_addr;
         obj["src_addr"] = src_addr; 
@@ -287,10 +279,9 @@ struct ThresholdCmdDto {
     static ThresholdCmdDto from_json(const QString& j) {
         ThresholdCmdDto t;
         QJsonObject obj = QJsonDocument::fromJson(j.toUtf8()).object();
-        t.node_id         = obj["node_id"].toString();
         t.actuator_type   = static_cast<uint8_t>(obj["actuator_type"].toInt());
-        t.element_addr    = obj["element_addr"].toInt();
-        t.src_addr        = obj["src_addr"].toInt(); 
+        t.element_addr    = static_cast<uint16_t>(obj["element_addr"].toInt());
+        t.src_addr        = static_cast<uint16_t>(obj["src_addr"].toInt());
         t.threshold_on    = obj["threshold_on"].toDouble(); 
         t.threshold_off   = obj["threshold_off"].toDouble(); 
         t.threshold_type  = static_cast<uint8_t>(obj.contains("threshold_type") ? obj["threshold_type"].toInt() : obj["type"].toInt());
@@ -300,7 +291,6 @@ struct ThresholdCmdDto {
 };
 
 struct ActuatorStatusDto {
-    QString node_id;
     int32_t element_addr    = 0;
     int32_t actuator_type   = 0;
     int32_t present_setpoint = 0;  
@@ -308,7 +298,6 @@ struct ActuatorStatusDto {
 
     QString to_json() const {
         QJsonObject obj;
-        obj["node_id"] = node_id; 
         obj["element_addr"] = element_addr;
         obj["actuator_type"] = actuator_type;
         obj["present_setpoint"] = present_setpoint; 
@@ -318,30 +307,31 @@ struct ActuatorStatusDto {
     static ActuatorStatusDto from_json(const QString& j) {
         ActuatorStatusDto a;
         QJsonObject obj = QJsonDocument::fromJson(j.toUtf8()).object();
-        a.node_id = obj["node_id"].toString();
-        a.element_addr = obj["element_addr"].toInt();
-        a.actuator_type = obj["actuator_type"].toInt();
-        a.present_setpoint = obj["present_setpoint"].toInt();
-        a.status = obj["status"].toInt();
+        a.element_addr = static_cast<uint16_t>(obj["element_addr"].toInt());
+        a.actuator_type = static_cast<uint16_t>(obj["actuator_type"].toInt());
+        a.present_setpoint = static_cast<uint16_t>(obj["present_setpoint"].toInt());
+        a.status = static_cast<uint16_t>(obj["status"].toInt());
         return a;
     }
     IPC_FROM_JSON(ActuatorStatusDto)
 };
 
 struct HeartbeatDto {
-    QString node_id;
+    uint16_t unicast = 0;
     bool    is_online = false;
     int32_t features  = 0;
 
     QString to_json() const {
         QJsonObject obj;
-        obj["node_id"] = node_id; obj["is_online"] = is_online; obj["features"] = features;
+        obj["unicast"] = unicast;
+        obj["is_online"] = is_online;
+        obj["features"] = features;
         return QJsonDocument(obj).toJson(QJsonDocument::Compact);
     }
     static HeartbeatDto from_json(const QString& j) {
         HeartbeatDto h;
         QJsonObject obj = QJsonDocument::fromJson(j.toUtf8()).object();
-        h.node_id = obj["node_id"].toString();
+        h.unicast = static_cast<uint16_t>(obj["unicast"].toInt());
         h.features = obj["features"].toInt();
         h.is_online = obj["is_online"].toBool();
         return h;
@@ -350,19 +340,19 @@ struct HeartbeatDto {
 };
 
 struct HealthFaultDto {
-    QString node_id;
+    uint16_t unicast = 0;
     QString fault_array_json = "[]";
 
     QString to_json() const {
         QJsonObject obj;
-        obj["node_id"] = node_id;
+        obj["unicast"] = unicast;
         obj["fault_array"] = QJsonDocument::fromJson(fault_array_json.toUtf8()).array();
         return QJsonDocument(obj).toJson(QJsonDocument::Compact);
     }
     static HealthFaultDto from_json(const QString& j) {
         HealthFaultDto d;
         QJsonObject obj = QJsonDocument::fromJson(j.toUtf8()).object();
-        d.node_id = obj["node_id"].toString();
+        d.unicast = static_cast<uint16_t>(obj["unicast"].toInt());
         QJsonArray arr = obj["fault_array"].toArray();
         d.fault_array_json = QJsonDocument(arr).toJson(QJsonDocument::Compact);
         if (d.fault_array_json.isEmpty() || d.fault_array_json == "null") d.fault_array_json = "[]";
@@ -390,7 +380,6 @@ struct UuidWhitelistDto {
 };
 
 struct ActuatorCmdDto {
-    QString node_id;
     int32_t element_addr = 0;   
     int32_t actuator_type = 0;
     int32_t device_type  = 0;
@@ -400,7 +389,6 @@ struct ActuatorCmdDto {
 
     QString to_json() const {
         QJsonObject obj;
-        obj["node_id"] = node_id; 
         obj["element_addr"] = element_addr;
         obj["actuator_type"] = actuator_type; 
         obj["device_type"] = device_type; 
@@ -412,12 +400,11 @@ struct ActuatorCmdDto {
     static ActuatorCmdDto from_json(const QString& j) {
         ActuatorCmdDto a;
         QJsonObject obj = QJsonDocument::fromJson(j.toUtf8()).object();
-        a.node_id = obj["node_id"].toString();
-        a.element_addr = obj["element_addr"].toInt();
-        a.actuator_type = obj["actuator_type"].toInt();
-        a.device_type = obj["device_type"].toInt();
+        a.element_addr = static_cast<uint16_t>(obj["element_addr"].toInt());
+        a.actuator_type = static_cast<uint16_t>(obj["actuator_type"].toInt());
+        a.device_type = static_cast<uint16_t>(obj["device_type"].toInt());
         a.setpoint = obj["setpoint"].toDouble();
-        a.status = obj["status"].toInt();
+        a.status = static_cast<uint16_t>(obj["status"].toInt());
         a.onoff = obj["onoff"].toBool();
         return a;
     }
@@ -425,7 +412,7 @@ struct ActuatorCmdDto {
 };
 
 struct GroupOpDto {
-    QString  node_id;
+    uint16_t addr;
     uint16_t element_addr = 0;
     uint16_t group_addr   = 0;
     uint16_t model_id     = 0;
@@ -439,7 +426,7 @@ struct GroupOpDto {
 
     QString to_json() const {
         QJsonObject obj;
-        obj["node_id"]      = node_id; 
+        obj["addr"]      = addr; 
         obj["element_addr"] = element_addr;
         obj["group_addr"]   = group_addr; 
         obj["model_id"]     = model_id; 
@@ -457,7 +444,7 @@ struct GroupOpDto {
         GroupOpDto d;
         QJsonObject obj = QJsonDocument::fromJson(j.toUtf8()).object();
         
-        d.node_id      = obj["node_id"].toString();
+        d.addr      = static_cast<uint16_t>(obj["addr"].toInt());
         d.element_addr = static_cast<uint16_t>(obj["element_addr"].toInt());
         d.group_addr   = static_cast<uint16_t>(obj["group_addr"].toInt());
         d.model_id     = static_cast<uint16_t>(obj["model_id"].toInt());
@@ -479,17 +466,17 @@ using GroupDeleteDto      = GroupOpDto;
 using PublishGroupDto     = GroupOpDto;
 
 struct DeleteNodeDto {
-    QString node_id;
+    uint16_t addr;
     QString uuid_hex;   
 
     QString to_json() const {
-        QJsonObject obj; obj["node_id"] = node_id; obj["uuid_hex"] = uuid_hex;
+        QJsonObject obj; obj["addr"] = addr; obj["uuid_hex"] = uuid_hex;
         return QJsonDocument(obj).toJson(QJsonDocument::Compact);
     }
     static DeleteNodeDto from_json(const QString& j) {
         DeleteNodeDto d;
         QJsonObject obj = QJsonDocument::fromJson(j.toUtf8()).object();
-        d.node_id = obj["node_id"].toString();
+        d.addr = static_cast<uint16_t>(obj["addr"].toInt());
         d.uuid_hex = obj["uuid_hex"].toString();
         return d;
     }

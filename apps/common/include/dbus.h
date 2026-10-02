@@ -10,7 +10,7 @@
 #include <vector>
 #include <semaphore>
 #include <chrono>
-#include "json_utils.h"
+#include "json_use.h"
 #include <fstream>
 
 
@@ -45,23 +45,26 @@ public:
         }
         std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
 
+        JsonUse::CJsonGuard root(content);
+        if (!root.ptr) {
+            return false;
+        }
+
         std::vector<std::string> modules = {"Mesh", "Db", "Mqtt", "UI"};
 
         for (const auto& mod : modules) {
-            std::string modBlock = jutil::get_object(content, mod, "");
-            
-            if (!modBlock.empty()) {
+            cJSON* modObj = JsonUse::get_object(root.ptr, mod.c_str());
+            if (modObj) {
                 DBusConfig cfg;
-                cfg.serviceName = jutil::get_str(modBlock, "serviceName");
-                cfg.objectPath = jutil::get_str(modBlock, "objectPath");
-                cfg.interfaceName = jutil::get_str(modBlock, "interfaceName");
-                
+                cfg.serviceName   = JsonUse::get_str(modObj, "serviceName");
+                cfg.objectPath    = JsonUse::get_str(modObj, "objectPath");
+                cfg.interfaceName = JsonUse::get_str(modObj, "interfaceName");
                 configs[mod] = cfg;
             }
         }
         return true;
     }
-    
+
     DBusConfig getConfig(const std::string& moduleName) {
         if (configs.find(moduleName) != configs.end()) {
             return configs[moduleName];
@@ -73,7 +76,6 @@ private:
     std::map<std::string, DBusConfig> configs;
     ConfigManager() {}
 };
-
 
 /**
  * @brief define task is method or signal in dbus

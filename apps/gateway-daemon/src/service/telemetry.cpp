@@ -24,11 +24,17 @@ void Telemetry::onGroupStatus(const MeshFrame& f)
         return;
     }
 
+    std::cout << "GroupStatus src=0x" << std::hex << f.addr << " group=0x" << std::hex << p->group_addr << " elem=0x" << std::hex << p->element_addr 
+              << " model=0x" << std::hex << p->model_id << " is_sub=" << std::dec << (int)p->is_sub 
+              << " is_add=" << std::dec << (int)p->is_add 
+              << " success=" << std::dec << (int)p->success
+              << "\n";
+
     uint16_t element_addr = f.addr;
     uint16_t primary_addr = node_register->resolve_primary(element_addr);
 
     GroupOpDto dto;
-    dto.node_id      = MeshUtils::node_id_from_unicast(primary_addr);
+    dto.addr      = primary_addr;
     dto.element_addr = p->element_addr;
     dto.group_addr   = p->group_addr;
     dto.model_id     = p->model_id;
@@ -51,11 +57,16 @@ void Telemetry::onSensorStatus(const MeshFrame& f)
         std::cerr << "[Telem] Sensor decode failed\n";
         return;
     }
-
+    std::cout << "SensorStatus src=0x" << std::hex << f.addr << " temp=" << std::dec << p->temperature 
+              << " soil=" << std::dec << p->soil_moisture 
+              << " hum=" << std::dec << (int)p->humidity 
+              << " lux=" << std::dec << (int)p->lux 
+              << " motion=" << std::dec << (int)p->motion 
+              << " battery=" << std::dec << (int)p->battery
+              << "\n";
     SensorDto dto;
-    dto.node_id = MeshUtils::node_id_from_unicast(f.addr);
     dto.element_addr = f.addr;
-    dto.temperature = p->temperature / 10.0;
+    dto.temperature = p->temperature;
     dto.soil_moisture = p->soil_moisture;
     dto.humidity = static_cast<double>(p->humidity);
     dto.lux = static_cast<double>(p->lux);
@@ -73,11 +84,15 @@ void Telemetry::onActuatorStatus(const MeshFrame& f)
         return;
     }
 
+    std::cout << "ActuatorStatus src=0x" << std::hex << f.addr 
+              << " type=" << std::dec << (int)p->actuator_type 
+              << " setpoint=" << std::dec << (int)p->current_setpoint 
+              << " status=" << std::dec << (int)p->status
+              << "\n";
     uint16_t element_addr = f.addr;
     uint16_t primary_addr = node_register->resolve_primary(element_addr);
 
     ActuatorStatusDto dto;
-    dto.node_id = MeshUtils::node_id_from_unicast(primary_addr);
     dto.element_addr = element_addr;
     dto.actuator_type = static_cast<int32_t>(p->actuator_type);
     dto.present_setpoint = static_cast<int32_t>(p->current_setpoint);

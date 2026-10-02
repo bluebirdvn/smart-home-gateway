@@ -2,7 +2,7 @@
 #define IPC_DTO_H
 
 #include "ipc_message.h"
-#include "json_utils.h"
+#include "cjson_use.h"
 #include <iomanip>
 #include <string>
 #include <vector>
@@ -20,41 +20,23 @@
         return m; \
     }
 
-static std::vector<int64_t> parse_int_array(const std::string& j, const std::string& key) {
-    std::vector<int64_t> res;
-    std::string search = "\"" + key + "\":[";
-    size_t start = j.find(search);
-    if (start == std::string::npos) {
-        return res;
-    }
-    start += search.length();
-    size_t end = j.find("]", start);
-    if (end == std::string::npos) {
-        return res;
-    }
-    std::string arr = j.substr(start, end - start);
-    std::stringstream ss(arr);
-    std::string token;
-    while (std::getline(ss, token, ',')) {
-        try { res.push_back(std::stoll(token)); } catch (...) {}
-    }
-    return res;
-}
-
 struct GroupGetAddrDto {
     std::string group_name;
     uint16_t group_addr = 0;
-    
+
     std::string to_json() const {
-        std::ostringstream o;
-        o << "{\"group_name\":\"" << jutil::esc(group_name) << "\",\"group_addr\":" << group_addr << "}";
-        return o.str();
+        cJSON* root = cJSON_CreateObject();
+        cJSON_AddStringToObject(root, "group_name", group_name.c_str());
+        cJSON_AddNumberToObject(root, "group_addr", group_addr);
+        return JsonUse::to_string(root);
     }
-    
+
     static GroupGetAddrDto from_json(const std::string& j) {
         GroupGetAddrDto d;
-        d.group_name = jutil::get_str(j, "group_name");
-        d.group_addr = static_cast<uint16_t>(jutil::get_int(j, "group_addr"));
+        JsonUse::CJsonGuard root(j);
+        if (!root.ptr) return d;
+        d.group_name = JsonUse::get_str(root.ptr, "group_name");
+        d.group_addr = static_cast<uint16_t>(JsonUse::get_int(root.ptr, "group_addr"));
         return d;
     }
     IPC_FROM_JSON(GroupGetAddrDto)
@@ -64,7 +46,7 @@ struct AutomationRuleDto {
     int groupId = 0;
     uint16_t meshGroupAddr = 0;
     std::string groupName = "";
-    bool isAutoMode = true; 
+    bool isAutoMode = true;
     std::vector<int64_t> sensorNodeIds;
     std::vector<int64_t> actuatorNodeIds;
     std::vector<int64_t> syncedSensorIds;
@@ -74,42 +56,36 @@ struct AutomationRuleDto {
     double thresholdOff = 0.0;
 
     std::string to_json() const {
-        std::ostringstream o;
-        o << "{\"groupId\":" << groupId 
-          << ",\"meshGroupAddr\":" << meshGroupAddr
-          << ",\"groupName\":\"" << jutil::esc(groupName) 
-          << "\",\"isAutoMode\":" << (isAutoMode ? "true" : "false")
-          << ",\"sensorType\":" << sensorType 
-          << ",\"thresholdOn\":" << thresholdOn
-          << ",\"thresholdOff\":" << thresholdOff << ",";
-
-        auto vecToString = [](const std::vector<int64_t>& vec) {
-            std::ostringstream s; s << "[";
-            for (size_t i = 0; i < vec.size(); ++i) s << (i ? "," : "") << vec[i];
-            s << "]"; return s.str();
-        };
-
-        o << "\"sensorNodeIds\":" << vecToString(sensorNodeIds)
-          << ",\"actuatorNodeIds\":" << vecToString(actuatorNodeIds)
-          << ",\"syncedSensorIds\":" << vecToString(syncedSensorIds)
-          << ",\"syncedActuatorIds\":" << vecToString(syncedActuatorIds) << "}";
-        return o.str();
+        cJSON* root = cJSON_CreateObject();
+        cJSON_AddNumberToObject(root, "groupId", groupId);
+        cJSON_AddNumberToObject(root, "meshGroupAddr", meshGroupAddr);
+        cJSON_AddStringToObject(root, "groupName", groupName.c_str());
+        cJSON_AddBoolToObject(root, "isAutoMode", isAutoMode);
+        cJSON_AddNumberToObject(root, "sensorType", sensorType);
+        cJSON_AddNumberToObject(root, "thresholdOn", thresholdOn);
+        cJSON_AddNumberToObject(root, "thresholdOff", thresholdOff);
+        JsonUse::add_int_array(root, "sensorNodeIds", sensorNodeIds);
+        JsonUse::add_int_array(root, "actuatorNodeIds", actuatorNodeIds);
+        JsonUse::add_int_array(root, "syncedSensorIds", syncedSensorIds);
+        JsonUse::add_int_array(root, "syncedActuatorIds", syncedActuatorIds);
+        return JsonUse::to_string(root);
     }
 
     static AutomationRuleDto from_json(const std::string& j) {
         AutomationRuleDto d;
-        d.groupId = jutil::get_int(j, "groupId");
-        d.meshGroupAddr = static_cast<uint16_t>(jutil::get_int(j, "meshGroupAddr"));
-        d.groupName = jutil::get_str(j, "groupName");
-        d.isAutoMode = jutil::get_bool(j, "isAutoMode", true);
-        d.sensorType = jutil::get_int(j, "sensorType");
-        d.thresholdOn = jutil::get_double(j, "thresholdOn");
-        d.thresholdOff = jutil::get_double(j, "thresholdOff");
-
-        d.sensorNodeIds = parse_int_array(j, "sensorNodeIds");
-        d.actuatorNodeIds = parse_int_array(j, "actuatorNodeIds");
-        d.syncedSensorIds = parse_int_array(j, "syncedSensorIds");
-        d.syncedActuatorIds = parse_int_array(j, "syncedActuatorIds");
+        JsonUse::CJsonGuard root(j);
+        if (!root.ptr) return d;
+        d.groupId        = static_cast<int>(JsonUse::get_int(root.ptr, "groupId"));
+        d.meshGroupAddr   = static_cast<uint16_t>(JsonUse::get_int(root.ptr, "meshGroupAddr"));
+        d.groupName       = JsonUse::get_str(root.ptr, "groupName");
+        d.isAutoMode      = JsonUse::get_bool(root.ptr, "isAutoMode", true);
+        d.sensorType      = static_cast<int>(JsonUse::get_int(root.ptr, "sensorType"));
+        d.thresholdOn     = JsonUse::get_double(root.ptr, "thresholdOn");
+        d.thresholdOff    = JsonUse::get_double(root.ptr, "thresholdOff");
+        d.sensorNodeIds       = JsonUse::get_int_array(root.ptr, "sensorNodeIds");
+        d.actuatorNodeIds     = JsonUse::get_int_array(root.ptr, "actuatorNodeIds");
+        d.syncedSensorIds     = JsonUse::get_int_array(root.ptr, "syncedSensorIds");
+        d.syncedActuatorIds   = JsonUse::get_int_array(root.ptr, "syncedActuatorIds");
         return d;
     }
     IPC_FROM_JSON(AutomationRuleDto)
@@ -119,73 +95,82 @@ struct GroupSyncListDto {
     std::vector<AutomationRuleDto> groups;
 
     std::string to_json() const {
-        std::ostringstream o;
-        o << "{\"groups\":[";
-        for (size_t i = 0; i < groups.size(); ++i) { o << (i ? "," : "") << groups[i].to_json(); }
-        o << "]}";
-        return o.str();
+        cJSON* root = cJSON_CreateObject();
+        cJSON* arr = cJSON_CreateArray();
+        for (const auto& g : groups) {
+            JsonUse::CJsonGuard gobj(g.to_json());
+            if (gobj.ptr) {
+                cJSON_AddItemToArray(arr, cJSON_Duplicate(gobj.ptr, true));
+            }
+        }
+        cJSON_AddItemToObject(root, "groups", arr);
+        return JsonUse::to_string(root);
     }
 
-    static GroupSyncListDto from_json(const std::string& j) { return GroupSyncListDto{}; } 
+    static GroupSyncListDto from_json(const std::string&) { return GroupSyncListDto{}; }
     IPC_FROM_JSON(GroupSyncListDto)
 };
 
 struct UnprovAdvDto {
-    std::string uuid;    
+    std::string uuid;
     int32_t     rssi     = 0;
-    int32_t     bearer   = 0;   
+    int32_t     bearer   = 0;
     int32_t     oob_info = 0;
 
     std::string to_json() const {
-        std::ostringstream o;
-        o << "{\"uuid\":\"" << jutil::esc(uuid) << "\",\"rssi\":" << rssi 
-          << ",\"bearer\":" << bearer << ",\"oob_info\":" << oob_info << "}";
-        return o.str();
+        cJSON* root = cJSON_CreateObject();
+        cJSON_AddStringToObject(root, "uuid", uuid.c_str());
+        cJSON_AddNumberToObject(root, "rssi", rssi);
+        cJSON_AddNumberToObject(root, "bearer", bearer);
+        cJSON_AddNumberToObject(root, "oob_info", oob_info);
+        return JsonUse::to_string(root);
     }
 
     static UnprovAdvDto from_json(const std::string& j) {
         UnprovAdvDto d;
-        d.uuid     = jutil::get_str(j, "uuid");
-        d.rssi     = jutil::get_int(j, "rssi");
-        d.bearer   = jutil::get_int(j, "bearer");
-        d.oob_info = jutil::get_int(j, "oob_info");
+        JsonUse::CJsonGuard root(j);
+        if (!root.ptr) return d;
+        d.uuid     = JsonUse::get_str(root.ptr, "uuid");
+        d.rssi     = static_cast<int32_t>(JsonUse::get_int(root.ptr, "rssi"));
+        d.bearer   = static_cast<int32_t>(JsonUse::get_int(root.ptr, "bearer"));
+        d.oob_info = static_cast<int32_t>(JsonUse::get_int(root.ptr, "oob_info"));
         return d;
     }
     IPC_FROM_JSON(UnprovAdvDto)
 };
 
 struct ModeAutoDto {
-    std::string node_id;
-    uint8_t actuator_type = 0;
-    uint16_t element_addr = 0;
-    bool is_auto = false;
-    
+    uint8_t  actuator_type = 0;
+    uint16_t element_addr  = 0;
+    bool     is_auto       = false;
+
     std::string to_json() const {
-        std::ostringstream o;
-        o << "{\"node_id\":\"" << jutil::esc(node_id) 
-          << "\",\"actuator_type\":" << static_cast<int>(actuator_type) 
-          << ",\"element_addr\":" << element_addr 
-          << ",\"is_auto\":" << (is_auto ? "true" : "false") << "}";
-        return o.str();
+        cJSON* root = cJSON_CreateObject();
+        cJSON_AddNumberToObject(root, "actuator_type", actuator_type);
+        cJSON_AddNumberToObject(root, "element_addr", element_addr);
+        cJSON_AddBoolToObject(root, "is_auto", is_auto);
+        return JsonUse::to_string(root);
     }
+
     static ModeAutoDto from_json(const std::string& j) {
         ModeAutoDto t;
-        t.node_id = jutil::get_str(j, "node_id");
-        t.element_addr = jutil::get_int(j, "element_addr");
-        t.actuator_type = static_cast<uint8_t>(jutil::get_int(j, "actuator_type"));
-        t.is_auto = jutil::get_bool(j, "is_auto");
+        JsonUse::CJsonGuard root(j);
+        if (!root.ptr) return t;
+        t.element_addr  = static_cast<uint16_t>(JsonUse::get_int(root.ptr, "element_addr"));
+        t.actuator_type = static_cast<uint8_t>(JsonUse::get_int(root.ptr, "actuator_type"));
+        t.is_auto       = JsonUse::get_bool(root.ptr, "is_auto");
         return t;
     }
     IPC_FROM_JSON(ModeAutoDto)
 };
 
 struct NodeInfoDto {
-    std::string node_id;
+    uint16_t addr;
     std::string name;
     std::string uuid;
     uint16_t net_idx = 0;
     uint16_t unicast = 0;
-    uint8_t element_num = 0;
+    uint8_t  element_num = 0;
     uint16_t element_addr = 0;
     uint16_t model_id = 0;
     uint16_t company_id = 0xFFFF;
@@ -193,151 +178,162 @@ struct NodeInfoDto {
     int devStatus = 0;
 
     std::string to_json() const {
-        std::ostringstream o;
-        o << "{\"node_id\":\"" << jutil::esc(node_id) 
-          << "\",\"name\":\"" << jutil::esc(name)
-          << "\",\"uuid\":\"" << jutil::esc(uuid)
-          << "\",\"net_idx\":" << net_idx 
-          << ",\"unicast\":" << unicast
-          << ",\"element_num\":" << static_cast<unsigned int>(element_num) 
-          << ",\"element_addr\":" << element_addr 
-          << ",\"model_id\":" << model_id 
-          << ",\"company_id\":" << company_id 
-          << ",\"nodeType\":" << nodeType
-          << ",\"devStatus\":" << devStatus
-          << "}";
-        return o.str();
+        cJSON* root = cJSON_CreateObject();
+        cJSON_AddNumberToObject(root, "addr", addr);
+        cJSON_AddStringToObject(root, "name", name.c_str());
+        cJSON_AddStringToObject(root, "uuid", uuid.c_str());
+        cJSON_AddNumberToObject(root, "net_idx", net_idx);
+        cJSON_AddNumberToObject(root, "unicast", unicast);
+        cJSON_AddNumberToObject(root, "element_num", element_num);
+        cJSON_AddNumberToObject(root, "element_addr", element_addr);
+        cJSON_AddNumberToObject(root, "model_id", model_id);
+        cJSON_AddNumberToObject(root, "company_id", company_id);
+        cJSON_AddNumberToObject(root, "nodeType", nodeType);
+        cJSON_AddNumberToObject(root, "devStatus", devStatus);
+        return JsonUse::to_string(root);
     }
-    
+
     static NodeInfoDto from_json(const std::string& j) {
-        NodeInfoDto d; 
-        d.node_id      = jutil::get_str(j, "node_id");
-        d.name         = jutil::get_str(j, "name");
-        d.uuid         = jutil::get_str(j, "uuid");
-        d.net_idx      = static_cast<uint16_t>(jutil::get_int(j, "net_idx"));
-        d.unicast      = static_cast<uint16_t>(jutil::get_int(j, "unicast"));
-        d.element_num  = static_cast<uint8_t>(jutil::get_int(j, "element_num"));
-        d.element_addr = static_cast<uint16_t>(jutil::get_int(j, "element_addr"));
-        d.model_id     = static_cast<uint16_t>(jutil::get_int(j, "model_id"));
-        d.company_id   = static_cast<uint16_t>(jutil::get_int(j, "company_id", 0xFFFF));
-        d.nodeType     = jutil::get_int(j, "nodeType");
-        d.devStatus    = jutil::get_int(j, "devStatus");
+        NodeInfoDto d;
+        JsonUse::CJsonGuard root(j);
+        if (!root.ptr) return d;
+        d.addr         = static_cast<uint16_t>(JsonUse::get_int(root.ptr, "addr"));
+        d.name         = JsonUse::get_str(root.ptr, "name");
+        d.uuid         = JsonUse::get_str(root.ptr, "uuid");
+        d.net_idx      = static_cast<uint16_t>(JsonUse::get_int(root.ptr, "net_idx"));
+        d.unicast      = static_cast<uint16_t>(JsonUse::get_int(root.ptr, "unicast"));
+        d.element_num  = static_cast<uint8_t>(JsonUse::get_int(root.ptr, "element_num"));
+        d.element_addr = static_cast<uint16_t>(JsonUse::get_int(root.ptr, "element_addr"));
+        d.model_id     = static_cast<uint16_t>(JsonUse::get_int(root.ptr, "model_id"));
+        d.company_id   = static_cast<uint16_t>(JsonUse::get_int(root.ptr, "company_id", 0xFFFF));
+        d.nodeType     = static_cast<int>(JsonUse::get_int(root.ptr, "nodeType"));
+        d.devStatus    = static_cast<int>(JsonUse::get_int(root.ptr, "devStatus"));
         return d;
     }
     IPC_FROM_JSON(NodeInfoDto)
 };
 
 struct SensorDto {
-    std::string node_id;
-    int32_t     element_addr = 0;
-    double      temperature = 0.0;  
-    double      humidity    = 0.0;  
-    double      lux         = 0.0;
-    double      soil_moisture = 0.0;
-    int32_t     motion      = 0;   
-    int32_t     battery     = 0;    
-    int32_t     status      = 0;
+    int32_t element_addr   = 0;
+    double  temperature    = 0.0;
+    double  humidity       = 0.0;
+    double  lux            = 0.0;
+    double  soil_moisture  = 0.0;
+    int32_t motion         = 0;
+    int32_t battery        = 0;
+    int32_t status         = 0;
 
     std::string to_json() const {
-        std::ostringstream o;
-        o << "{\"node_id\":\"" << jutil::esc(node_id) << "\",\"element_addr\":" << element_addr
-          << ",\"temperature\":" << temperature 
-          << ",\"humidity\":" << humidity 
-          << ",\"soil_moisture\":" << soil_moisture
-          << ",\"lux\":" << lux
-          << ",\"motion\":" << motion 
-          << ",\"battery\":" << battery 
-          << ",\"status\":" << status << "}";
-        return o.str();
+        cJSON* root = cJSON_CreateObject();
+        cJSON_AddNumberToObject(root, "element_addr", element_addr);
+        cJSON_AddNumberToObject(root, "temperature", temperature);
+        cJSON_AddNumberToObject(root, "humidity", humidity);
+        cJSON_AddNumberToObject(root, "soil_moisture", soil_moisture);
+        cJSON_AddNumberToObject(root, "lux", lux);
+        cJSON_AddNumberToObject(root, "motion", motion);
+        cJSON_AddNumberToObject(root, "battery", battery);
+        cJSON_AddNumberToObject(root, "status", status);
+        return JsonUse::to_string(root);
     }
 
     static SensorDto from_json(const std::string& j) {
         SensorDto s;
-        s.node_id     = jutil::get_str(j, "node_id");
-        s.element_addr = jutil::get_int(j, "element_addr");
-        s.temperature = jutil::get_double(j, "temperature");
-        s.humidity    = jutil::get_double(j, "humidity");
-        s.soil_moisture = jutil::get_double(j, "soil_moisture");
-        s.lux         = jutil::get_double(j, "lux");
-        s.motion      = jutil::get_int(j, "motion");
-        s.battery     = jutil::get_int(j, "battery");
-        s.status      = jutil::get_int(j, "status");
+        JsonUse::CJsonGuard root(j);
+        if (!root.ptr) return s;
+        s.element_addr  = static_cast<int32_t>(JsonUse::get_int(root.ptr, "element_addr"));
+        s.temperature   = JsonUse::get_double(root.ptr, "temperature");
+        s.humidity      = JsonUse::get_double(root.ptr, "humidity");
+        s.soil_moisture = JsonUse::get_double(root.ptr, "soil_moisture");
+        s.lux           = JsonUse::get_double(root.ptr, "lux");
+        s.motion        = static_cast<int32_t>(JsonUse::get_int(root.ptr, "motion"));
+        s.battery       = static_cast<int32_t>(JsonUse::get_int(root.ptr, "battery"));
+        s.status        = static_cast<int32_t>(JsonUse::get_int(root.ptr, "status"));
         return s;
     }
     IPC_FROM_JSON(SensorDto)
 };
 
 struct ActuatorStatusDto {
-    std::string node_id;
-    int32_t     element_addr = 0;
-    int32_t     actuator_type    = 0;
-    int32_t     present_setpoint = 0;
-    int32_t     status     = 0;
+    int32_t element_addr     = 0;
+    int32_t actuator_type    = 0;
+    int32_t present_setpoint = 0;
+    int32_t status           = 0;
 
     std::string to_json() const {
-        std::ostringstream o;
-        o << "{\"node_id\":\"" << jutil::esc(node_id) 
-          << "\",\"element_addr\":" << element_addr
-          << ",\"actuator_type\":" << actuator_type
-          << ",\"present_setpoint\":" << present_setpoint 
-          << ",\"status\":" << status << "}";
-        return o.str();
+        cJSON* root = cJSON_CreateObject();
+        cJSON_AddNumberToObject(root, "element_addr", element_addr);
+        cJSON_AddNumberToObject(root, "actuator_type", actuator_type);
+        cJSON_AddNumberToObject(root, "present_setpoint", present_setpoint);
+        cJSON_AddNumberToObject(root, "status", status);
+        return JsonUse::to_string(root);
     }
 
     static ActuatorStatusDto from_json(const std::string& j) {
         ActuatorStatusDto a;
-        a.node_id          = jutil::get_str(j, "node_id");
-        a.element_addr     = jutil::get_int(j, "element_addr");
-        a.actuator_type    = jutil::get_int(j, "actuator_type");
-        a.present_setpoint = jutil::get_int(j, "present_setpoint");
-        a.status           = jutil::get_int(j, "status");
+        JsonUse::CJsonGuard root(j);
+        if (!root.ptr) return a;
+        a.element_addr     = static_cast<int32_t>(JsonUse::get_int(root.ptr, "element_addr"));
+        a.actuator_type    = static_cast<int32_t>(JsonUse::get_int(root.ptr, "actuator_type"));
+        a.present_setpoint = static_cast<int32_t>(JsonUse::get_int(root.ptr, "present_setpoint"));
+        a.status           = static_cast<int32_t>(JsonUse::get_int(root.ptr, "status"));
         return a;
     }
     IPC_FROM_JSON(ActuatorStatusDto)
 };
 
 struct HeartbeatDto {
-    std::string node_id;
-    bool is_online = false;
-    int32_t features = 0;
+    uint16_t unicast  = 0;
+    bool     is_online = false;
+    int32_t  features = 0;
 
     std::string to_json() const {
-        std::ostringstream o;
-        o << "{\"node_id\":\"" << jutil::esc(node_id) << "\",\"is_online\":" << (is_online ? "true" : "false") 
-          << ",\"features\":" << features << "}";
-        return o.str();
+        cJSON* root = cJSON_CreateObject();
+        cJSON_AddNumberToObject(root, "unicast", unicast);
+        cJSON_AddBoolToObject(root, "is_online", is_online);
+        cJSON_AddNumberToObject(root, "features", features);
+        return JsonUse::to_string(root);
     }
 
     static HeartbeatDto from_json(const std::string& j) {
         HeartbeatDto h;
-        h.node_id  = jutil::get_str(j, "node_id");
-        h.features = jutil::get_int(j, "features");
-        h.is_online = jutil::get_bool(j, "is_online");
+        JsonUse::CJsonGuard root(j);
+        if (!root.ptr) return h;
+        h.unicast   = static_cast<uint16_t>(JsonUse::get_int(root.ptr, "unicast"));
+        h.features  = static_cast<int32_t>(JsonUse::get_int(root.ptr, "features"));
+        h.is_online = JsonUse::get_bool(root.ptr, "is_online");
         return h;
     }
     IPC_FROM_JSON(HeartbeatDto)
 };
 
 struct HealthFaultDto {
-    std::string node_id;
+    uint16_t unicast = 0;
     std::string fault_array_json = "[]";
 
     std::string to_json() const {
-        std::ostringstream o;
-        o << "{\"node_id\":\"" << jutil::esc(node_id) << "\",\"fault_array\":" << (fault_array_json.empty() ? "[]" : fault_array_json) << "}";
-        return o.str();
+        cJSON* root = cJSON_CreateObject();
+        cJSON_AddNumberToObject(root, "unicast", unicast);
+
+        cJSON* arr = cJSON_Parse(fault_array_json.c_str());
+        if (!arr || !cJSON_IsArray(arr)) {
+            if (arr) cJSON_Delete(arr);
+            arr = cJSON_CreateArray();
+        }
+        cJSON_AddItemToObject(root, "fault_array", arr);
+        return JsonUse::to_string(root);
     }
 
     static HealthFaultDto from_json(const std::string& j) {
         HealthFaultDto d;
-        d.node_id = jutil::get_str(j, "node_id");
-        auto start = j.find("\"fault_array\":[");
-        if (start != std::string::npos) {
-            start += 14; 
-            auto end = j.find("]", start);
-            if (end != std::string::npos) d.fault_array_json = j.substr(start, end - start + 1);
+        JsonUse::CJsonGuard root(j);
+        if (!root.ptr) return d;
+        d.unicast = static_cast<uint16_t>(JsonUse::get_int(root.ptr, "unicast"));
+
+        cJSON* arr = cJSON_GetObjectItemCaseSensitive(root.ptr, "fault_array");
+        if (cJSON_IsArray(arr)) {
+            char* s = cJSON_PrintUnformatted(arr);
+            if (s) { d.fault_array_json = s; std::free(s); }
         }
-        if (d.fault_array_json.empty()) d.fault_array_json = "[]";
         return d;
     }
     IPC_FROM_JSON(HealthFaultDto)
@@ -348,98 +344,102 @@ struct UuidWhitelistDto {
     int32_t bearer = 0;
 
     std::string to_json() const {
-        std::ostringstream o;
-        o << "{\"uuid\":\"" << jutil::esc(uuid) << "\",\"bearer\":" << bearer << "}";
-        return o.str();
+        cJSON* root = cJSON_CreateObject();
+        cJSON_AddStringToObject(root, "uuid", uuid.c_str());
+        cJSON_AddNumberToObject(root, "bearer", bearer);
+        return JsonUse::to_string(root);
     }
 
     static UuidWhitelistDto from_json(const std::string& j) {
         UuidWhitelistDto d;
-        d.uuid   = jutil::get_str(j, "uuid");
-        if (d.uuid.empty()) d.uuid = jutil::get_str(j, "uuid_match_hex");
-        d.bearer = jutil::get_int(j, "bearer");
+        JsonUse::CJsonGuard root(j);
+        if (!root.ptr) return d;
+        d.uuid = JsonUse::get_str(root.ptr, "uuid");
+        if (d.uuid.empty()) d.uuid = JsonUse::get_str(root.ptr, "uuid_match_hex");
+        d.bearer = static_cast<int32_t>(JsonUse::get_int(root.ptr, "bearer"));
         return d;
     }
     IPC_FROM_JSON(UuidWhitelistDto)
 };
 
 struct ActuatorCmdDto {
-    std::string node_id;
-    int32_t     element_addr = 0;
-    int32_t     actuator_type = 0;
-    int32_t     device_type   = 0;
-    double      setpoint    = 0.0;
-    uint8_t     status = 0;
-    bool        onoff       = false;
+    int32_t element_addr  = 0;
+    int32_t actuator_type = 0;
+    int32_t device_type   = 0;
+    double  setpoint      = 0.0;
+    uint8_t status        = 0;
+    bool    onoff         = false;
 
     std::string to_json() const {
-        std::ostringstream o;
-        o << "{\"node_id\":\"" << jutil::esc(node_id) << "\",\"element_addr\":" << element_addr
-          << ",\"actuator_type\":" << actuator_type << ",\"device_type\":" << device_type
-          << ",\"setpoint\":" << setpoint 
-          << ",\"status\":" << static_cast<int>(status)
-          << ",\"onoff\":" << (onoff ? "true" : "false") << "}";
-        return o.str();
+        cJSON* root = cJSON_CreateObject();
+        cJSON_AddNumberToObject(root, "element_addr", element_addr);
+        cJSON_AddNumberToObject(root, "actuator_type", actuator_type);
+        cJSON_AddNumberToObject(root, "device_type", device_type);
+        cJSON_AddNumberToObject(root, "setpoint", setpoint);
+        cJSON_AddNumberToObject(root, "status", status);
+        cJSON_AddBoolToObject(root, "onoff", onoff);
+        return JsonUse::to_string(root);
     }
 
     static ActuatorCmdDto from_json(const std::string& j) {
         ActuatorCmdDto a;
-        a.node_id         = jutil::get_str(j, "node_id");
-        a.element_addr    = jutil::get_int(j, "element_addr");
-        a.actuator_type   = jutil::get_int(j, "actuator_type");
-        a.device_type     = jutil::get_int(j, "device_type");
-        a.setpoint        = jutil::get_double(j, "setpoint");
-        a.status =        static_cast<uint8_t>(jutil::get_int(j, "status"));
-        a.onoff           = jutil::get_bool(j, "onoff");
+        JsonUse::CJsonGuard root(j);
+        if (!root.ptr) return a;
+        a.element_addr  = static_cast<int32_t>(JsonUse::get_int(root.ptr, "element_addr"));
+        a.actuator_type = static_cast<int32_t>(JsonUse::get_int(root.ptr, "actuator_type"));
+        a.device_type   = static_cast<int32_t>(JsonUse::get_int(root.ptr, "device_type"));
+        a.setpoint      = JsonUse::get_double(root.ptr, "setpoint");
+        a.status        = static_cast<uint8_t>(JsonUse::get_int(root.ptr, "status"));
+        a.onoff         = JsonUse::get_bool(root.ptr, "onoff");
         return a;
     }
     IPC_FROM_JSON(ActuatorCmdDto)
 };
 
 struct GroupOpDto {
-    std::string node_id;
-    uint16_t    element_addr = 0;
-    uint16_t    group_addr   = 0;
-    uint16_t    model_id     = 0;
-    uint16_t    company_id   = 0xFFFF;
-    bool        is_sub       = false; 
-    bool        is_add       = true;  
-    uint8_t     pub_ttl      = 0;      
-    uint8_t     pub_period   = 0;
-    uint8_t     cmd_or_event = 0; 
-    bool        success      = false; 
+    uint16_t addr;
+    uint16_t element_addr = 0;
+    uint16_t group_addr   = 0;
+    uint16_t model_id     = 0;
+    uint16_t company_id   = 0xFFFF;
+    bool     is_sub       = false;
+    bool     is_add       = true;
+    uint8_t  pub_ttl      = 0;
+    uint8_t  pub_period   = 0;
+    uint8_t  cmd_or_event = 0;
+    bool     success      = false;
 
     std::string to_json() const {
-        std::ostringstream o;
-        o << "{"
-          << "\"node_id\":\""      << jutil::esc(node_id)            << "\","
-          << "\"element_addr\":"   << element_addr                   << ","
-          << "\"group_addr\":"     << group_addr                     << ","
-          << "\"model_id\":"       << model_id                       << ","
-          << "\"company_id\":"     << company_id                     << ","
-          << "\"is_sub\":"         << (is_sub ? "true" : "false")    << ","
-          << "\"is_add\":"         << (is_add ? "true" : "false")    << ","
-          << "\"pub_ttl\":"        << static_cast<int>(pub_ttl)      << ","
-          << "\"pub_period\":"     << static_cast<int>(pub_period)   << ","
-          << "\"cmd_or_event\":"   << static_cast<int>(cmd_or_event) << ","
-          << "\"success\":"        << (success ? "true" : "false")
-          << "}";
-        return o.str();
+        cJSON* root = cJSON_CreateObject();
+        cJSON_AddNumberToObject(root, "addr", addr);
+        cJSON_AddNumberToObject(root, "element_addr", element_addr);
+        cJSON_AddNumberToObject(root, "group_addr", group_addr);
+        cJSON_AddNumberToObject(root, "model_id", model_id);
+        cJSON_AddNumberToObject(root, "company_id", company_id);
+        cJSON_AddBoolToObject(root, "is_sub", is_sub);
+        cJSON_AddBoolToObject(root, "is_add", is_add);
+        cJSON_AddNumberToObject(root, "pub_ttl", pub_ttl);
+        cJSON_AddNumberToObject(root, "pub_period", pub_period);
+        cJSON_AddNumberToObject(root, "cmd_or_event", cmd_or_event);
+        cJSON_AddBoolToObject(root, "success", success);
+        return JsonUse::to_string(root);
     }
 
     static GroupOpDto from_json(const std::string& j) {
-        GroupOpDto d;
-        d.node_id      = jutil::get_str(j, "node_id");
-        d.element_addr = static_cast<uint16_t>(jutil::get_int(j, "element_addr"));
-        d.group_addr   = static_cast<uint16_t>(jutil::get_int(j, "group_addr"));
-        d.model_id     = static_cast<uint16_t>(jutil::get_int(j, "model_id"));
-        d.company_id   = static_cast<uint16_t>(jutil::get_int(j, "company_id", 0xFFFF));
-        d.pub_ttl      = static_cast<uint8_t>(jutil::get_int(j, "pub_ttl", 0));
-        d.pub_period   = static_cast<uint8_t>(jutil::get_int(j, "pub_period", 0));
-        d.cmd_or_event = static_cast<uint8_t>(jutil::get_int(j, "cmd_or_event", 0));
-        d.is_sub       = jutil::get_bool(j, "is_sub", false);
-        d.is_add       = jutil::get_bool(j, "is_add", true);
-        d.success      = jutil::get_bool(j, "success", false);
+        GroupOpDto d{};
+        JsonUse::CJsonGuard root(j);
+        if (!root.ptr) return d;
+        d.addr         = static_cast<uint16_t>(JsonUse::get_int(root.ptr, "addr"));
+        d.element_addr = static_cast<uint16_t>(JsonUse::get_int(root.ptr, "element_addr"));
+        d.group_addr   = static_cast<uint16_t>(JsonUse::get_int(root.ptr, "group_addr"));
+        d.model_id     = static_cast<uint16_t>(JsonUse::get_int(root.ptr, "model_id"));
+        d.company_id   = static_cast<uint16_t>(JsonUse::get_int(root.ptr, "company_id", 0xFFFF));
+        d.pub_ttl      = static_cast<uint8_t>(JsonUse::get_int(root.ptr, "pub_ttl", 0));
+        d.pub_period   = static_cast<uint8_t>(JsonUse::get_int(root.ptr, "pub_period", 0));
+        d.cmd_or_event = static_cast<uint8_t>(JsonUse::get_int(root.ptr, "cmd_or_event", 0));
+        d.is_sub       = JsonUse::get_bool(root.ptr, "is_sub", false);
+        d.is_add       = JsonUse::get_bool(root.ptr, "is_add", true);
+        d.success      = JsonUse::get_bool(root.ptr, "success", false);
         return d;
     }
     IPC_FROM_JSON(GroupOpDto)
@@ -451,52 +451,57 @@ using GroupDeleteDto      = GroupOpDto;
 using PublishGroupDto     = GroupOpDto;
 
 struct DeleteNodeDto {
-    std::string node_id;
+    uint16_t addr;
     std::string uuid_hex;
+
     std::string to_json() const {
-        std::ostringstream o; 
-        o << "{\"node_id\":\"" << jutil::esc(node_id) << "\",\"uuid_hex\":\"" << jutil::esc(uuid_hex) << "\"}";
-        return o.str();
+        cJSON* root = cJSON_CreateObject();
+        cJSON_AddNumberToObject(root, "addr", addr);
+        cJSON_AddStringToObject(root, "uuid_hex", uuid_hex.c_str());
+        return JsonUse::to_string(root);
     }
+
     static DeleteNodeDto from_json(const std::string& j) {
-        DeleteNodeDto d; 
-        d.node_id = jutil::get_str(j, "node_id"); 
-        d.uuid_hex = jutil::get_str(j, "uuid_hex"); 
+        DeleteNodeDto d{};
+        JsonUse::CJsonGuard root(j);
+        if (!root.ptr) return d;
+        d.addr     = static_cast<uint16_t>(JsonUse::get_int(root.ptr, "addr"));
+        d.uuid_hex = JsonUse::get_str(root.ptr, "uuid_hex");
         return d;
     }
     IPC_FROM_JSON(DeleteNodeDto)
 };
 
 struct ThresholdCmdDto {
-    std::string node_id;
-    uint8_t     actuator_type = 0;
-    int32_t     element_addr  = 0;
-    int         src_addr      = 0;
-    double      threshold_on  = 0.0;
-    double      threshold_off = 0.0;
-    uint8_t     threshold_type = 0; 
+    uint8_t actuator_type  = 0;
+    int32_t element_addr   = 0;
+    int     src_addr       = 0;
+    double  threshold_on   = 0.0;
+    double  threshold_off  = 0.0;
+    uint8_t threshold_type = 0;
 
     std::string to_json() const {
-        std::ostringstream o;
-        o << "{\"node_id\":\"" << jutil::esc(node_id) 
-          << "\",\"actuator_type\":" << static_cast<int>(actuator_type) 
-          << ",\"element_addr\":" << element_addr 
-          << ",\"src_addr\":" << src_addr 
-          << ",\"threshold_on\":" << threshold_on 
-          << ",\"threshold_off\":" << threshold_off 
-          << ",\"threshold_type\":" << static_cast<int>(threshold_type) << "}";
-        return o.str();
+        cJSON* root = cJSON_CreateObject();
+        cJSON_AddNumberToObject(root, "actuator_type", actuator_type);
+        cJSON_AddNumberToObject(root, "element_addr", element_addr);
+        cJSON_AddNumberToObject(root, "src_addr", src_addr);
+        cJSON_AddNumberToObject(root, "threshold_on", threshold_on);
+        cJSON_AddNumberToObject(root, "threshold_off", threshold_off);
+        cJSON_AddNumberToObject(root, "threshold_type", threshold_type);
+        return JsonUse::to_string(root);
     }
 
     static ThresholdCmdDto from_json(const std::string& j) {
         ThresholdCmdDto t;
-        t.node_id        = jutil::get_str(j, "node_id");
-        t.actuator_type  = static_cast<uint8_t>(jutil::get_int(j, "actuator_type"));
-        t.element_addr   = jutil::get_int(j, "element_addr"); 
-        t.src_addr       = jutil::get_int(j, "src_addr");
-        t.threshold_on   = jutil::get_double(j, "threshold_on");
-        t.threshold_off  = jutil::get_double(j, "threshold_off");
-        t.threshold_type = static_cast<uint8_t>(jutil::get_int(j, "threshold_type", jutil::get_int(j, "type", 0))); 
+        JsonUse::CJsonGuard root(j);
+        if (!root.ptr) return t;
+        t.actuator_type  = static_cast<uint8_t>(JsonUse::get_int(root.ptr, "actuator_type"));
+        t.element_addr   = static_cast<int32_t>(JsonUse::get_int(root.ptr, "element_addr"));
+        t.src_addr       = static_cast<int>(JsonUse::get_int(root.ptr, "src_addr"));
+        t.threshold_on   = JsonUse::get_double(root.ptr, "threshold_on");
+        t.threshold_off  = JsonUse::get_double(root.ptr, "threshold_off");
+        int64_t thType   = JsonUse::get_int(root.ptr, "threshold_type", JsonUse::get_int(root.ptr, "type", 0));
+        t.threshold_type = static_cast<uint8_t>(thType);
         return t;
     }
     IPC_FROM_JSON(ThresholdCmdDto)
@@ -504,12 +509,19 @@ struct ThresholdCmdDto {
 
 struct ModuleStatusDto {
     int status = 0;
+
     std::string to_json() const {
-        std::ostringstream o; o << "{\"status\":" << status << "}";
-        return o.str();
+        cJSON* root = cJSON_CreateObject();
+        cJSON_AddNumberToObject(root, "status", status);
+        return JsonUse::to_string(root);
     }
+
     static ModuleStatusDto from_json(const std::string& j) {
-        ModuleStatusDto d; d.status = jutil::get_int(j, "status"); return d;
+        ModuleStatusDto d;
+        JsonUse::CJsonGuard root(j);
+        if (!root.ptr) return d;
+        d.status = static_cast<int>(JsonUse::get_int(root.ptr, "status"));
+        return d;
     }
     IPC_FROM_JSON(ModuleStatusDto)
 };

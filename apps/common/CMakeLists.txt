@@ -1,6 +1,6 @@
 pkg_check_modules(GDBUS REQUIRED gio-2.0 glib-2.0)
 
-find_package(Threads REQUIRED)
+find_package(Threads cjson REQUIRED)
 file(GLOB_RECURSE SOURCES "src/*.cpp")
 
 add_library(common STATIC ${SOURCES})
@@ -12,6 +12,6 @@ target_include_directories(common PUBLIC
 
 
 target_link_libraries(common PUBLIC ${GDBUS_LIBRARIES}
-                        Threads::Threads)
+                        Threads::Threads cjson)
 target_link_directories(common PUBLIC ${GDBUS_LIBRARY_DIRS})
 target_compile_options(common PUBLIC ${GDBUS_FLAGS_OTHERS})
