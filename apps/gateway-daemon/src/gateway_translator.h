@@ -31,17 +31,6 @@ class GatewayTranslator {
 public:
     using IpcHandler = std::function<void(const IpcMessage&)>;
 
-    static uint16_t get_primary_addr(const std::string& node_id, uint16_t element_addr, std::shared_ptr<NodeRegistry> reg) {
-        uint16_t uni = 0;
-        if (reg && element_addr != 0) {
-            uni = reg->resolve_primary(element_addr);
-        }
-        if (uni == 0) {
-            uni = ::unicast_from_node_id(node_id);
-        }
-        return uni;
-    }
-
     static IpcHandler make_set_uuid_match_handler(MeshCommandSender& sender) {
         return [&sender](const IpcMessage& msg) {
             std::cout << "Received SetUuidMatchCmd: " << msg.payload << "\n";
