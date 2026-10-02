@@ -2,6 +2,9 @@
 #include <QDateTime>
 #include <QVariantMap>
 #include <cstring>
+#include <QTimer>
+static const int PendingTimeoutMs = 5000;
+
 
 DeviceModel::DeviceModel(QObject *parent) : QAbstractListModel(parent) {}
 
@@ -34,10 +37,12 @@ int DeviceModel::rowCount(const QModelIndex &parent) const
     return devices.count();
 }
 
-QString DeviceModel::getNodeUuid(const QString &nodeId) const
+QString DeviceModel::getNodeUuid(const uint16_t &addr) const
 {
     for (const auto &d : devices) {
-        if (d.nodeId == nodeId) return d.uuid;
+        if (d.addr == addr) {
+            return d.uuid;
+        }
     }
     return QString();
 }
@@ -54,6 +59,47 @@ int DeviceModel::activeDevices() const
     }
 
     return count;
+}
+void DeviceModel::setPending(uint16_t addr, bool pending) {
+    for (int i = 0; i < devices.count(); ++i) {
+        if (devices[i].addr != addr) {
+            continue;
+        }
+        if (!pending && !devices[i].pending) {
+            return;
+        }           
+        const quint64 since = QDateTime::currentMSecsSinceEpoch();
+        devices[i].pending      = pending;
+        devices[i].pendingSince = pending ? since : 0;
+        emit dataChanged(index(i), index(i), {PendingRole});
+        emit pendingChanged(addr, pending);
+        if (pending) {
+            QTimer::singleShot(PendingTimeoutMs, this, [this, addr, since]() {
+                for (const auto &d : devices) {
+                    if (d.addr == addr && d.pending && d.pendingSince == since) {
+                        setPending(addr, false);
+                        emit pendingTimedOut(addr);
+                        return;
+                    }
+                }
+            });
+        }
+        return;
+    }
+}
+
+bool DeviceModel::isPending(int addr) const {
+    for (const auto &d : devices) if (d.addr == addr) return d.pending;
+    return false;
+}
+
+QString DeviceModel::nameByAddr(int addr) const {
+    for (const auto &d : devices) {
+        if (d.addr == addr) {
+            return d.name;
+        } 
+    }
+    return QString("0x%1").arg(addr, 4, 16, QChar('0')).toUpper();
 }
 
 void DeviceModel::clearAllDevices()
@@ -72,11 +118,11 @@ void DeviceModel::clearAllDevices()
     emit averagesChanged();
 }
 
-uint16_t DeviceModel::getNodeAddr(const QString &nodeId) const
+uint16_t DeviceModel::getNodeAddr(const uint16_t &addr) const
 {
     for (const auto &d : devices)
     {
-        if (d.nodeId == nodeId)
+        if (d.addr == addr)
         {
             return d.addr;
         }
@@ -85,34 +131,48 @@ uint16_t DeviceModel::getNodeAddr(const QString &nodeId) const
     return 0;
 }
 
-uint16_t DeviceModel::getNodeModelId(const QString &nodeId) const
+uint16_t DeviceModel::getNodeModelId(const uint16_t &addr) const
 {
     for (const auto &d : devices) {
-        if (d.nodeId == nodeId) {
+        if (d.addr == addr) {
             return d.model_id;
         }
     }
     return 0;
 }
 
-int32_t DeviceModel::getDeviceType(const QString &nodeId) const
+int32_t DeviceModel::getDeviceType(const uint16_t &addr) const
 {
-    for (const auto &d : devices) {
-        if (d.nodeId == nodeId) {
-            return d.data.actuator.actuatorType;
+   for (const auto &d : devices) {
+        if (d.addr != addr) continue;
+        switch (d.model_id) {                      
+            case VND_MODEL_ID_ACTUATOR_RELAY: return 1;
+            case VND_MODEL_ID_ACTUATOR_LIGHT: return 2;
+            case VND_MODEL_ID_ACTUATOR_AC:    return 3;
+            default:                          return 0;
         }
     }
     return 0;
 }
 
-uint16_t DeviceModel::getNodeCompanyId(const QString &nodeId) const
+uint16_t DeviceModel::getNodeCompanyId(const uint16_t &addr) const
 {
     for (const auto &d : devices) {
-        if (d.nodeId == nodeId) {
+        if (d.addr == addr) {
             return d.company_id;
         }
     }
     return 0xFFFF;
+}
+
+uint16_t DeviceModel::getUnicastByAddr(const uint16_t &addr) const
+{
+    for (const auto &d : devices) {
+        if (d.addr == addr) {
+            return d.unicast;
+        }
+    }
+    return 0;
 }
 
 QVariant DeviceModel::data(const QModelIndex &index, int role) const {
@@ -121,7 +181,6 @@ QVariant DeviceModel::data(const QModelIndex &index, int role) const {
     }
     const deviceInfo &dev = devices.at(index.row());
     switch (role) {
-        case NodeIDRole: return dev.nodeId;
         case AddrRole:   return QString("0x%1").arg(dev.addr, 4, 16, QChar('0')).toUpper();
         case NameRole:   return dev.name;
         case NodeTypeRole: return static_cast<int>(dev.kind);
@@ -140,6 +199,8 @@ QVariant DeviceModel::data(const QModelIndex &index, int role) const {
         case FeaturesRole: return dev.features;
         case ModelIdRole: return dev.model_id;
         case CompanyIdRole: return dev.company_id;
+        case AddrNumRole: return dev.addr;
+        case PendingRole: return dev.pending;
         default: return QVariant();
     }
 }
@@ -147,8 +208,8 @@ QVariant DeviceModel::data(const QModelIndex &index, int role) const {
 
 QHash<int, QByteArray> DeviceModel::roleNames() const {
     return {
-        {NodeIDRole, "nodeId"},
         {AddrRole, "devAddr"},
+        {AddrNumRole, "devAddrNum"},
         {NameRole, "devName"},
         {NodeTypeRole, "nodeType"},
         {StatusRole, "devStatus"},
@@ -165,39 +226,38 @@ QHash<int, QByteArray> DeviceModel::roleNames() const {
         {ModelIdRole, "devModelId"},
         {CompanyIdRole, "devCompanyId"},
         {IsLightRole, "devIsLight"},
-        {IsAcRole, "devIsAc"}
+        {IsAcRole, "devIsAc"},
+        {PendingRole, "devPending"}
     };
 }
 
-void DeviceModel::markOnline(const QString& nodeId, int features, quint64 lastSeen) {
+void DeviceModel::markOnline(const uint16_t &unicast, int features, quint64 lastSeen) {
+    if (unicast == 0) return;
     for (int i = 0; i < devices.count(); ++i) {
-        if (devices[i].nodeId == nodeId) {
-            devices[i].status = 1; 
-            devices[i].features = features; 
-            devices[i].lastSeen = lastSeen;
-            emit dataChanged(index(i), index(i), {StatusRole, FeaturesRole});
-            emit deviceCountChanged();
-            return;
-        }
+        if (devices[i].unicast != unicast) continue;
+        devices[i].status   = 1;
+        devices[i].features = features;
+        devices[i].lastSeen = lastSeen;
+        emit dataChanged(index(i), index(i), {StatusRole, FeaturesRole});
     }
+    calculateAverages();
+    emit deviceCountChanged();
 }
 
-
-void DeviceModel::markOffline(const QString& nodeId) {
+void DeviceModel::markOffline(const uint16_t &unicast) {
+    if (unicast == 0) return;
     for (int i = 0; i < devices.count(); ++i) {
-        if (devices[i].nodeId == nodeId) {
-            devices[i].status = 0;
-            emit dataChanged(index(i), index(i), {StatusRole});
-            emit deviceCountChanged();
-            return;
-        }
+        if (devices[i].unicast != unicast) continue;
+        devices[i].status = 0;
+        emit dataChanged(index(i), index(i), {StatusRole});
     }
+    calculateAverages();
+    emit deviceCountChanged();
 }
 
-
-void DeviceModel::updateSensorData(const QString& nodeId, float temp, float humi, float soil, float lux, float motion, int battery, quint64 lastSeen) {
+void DeviceModel::updateSensorData(const uint16_t &addr, float temp, float humi, float soil, float lux, float motion, int battery, quint64 lastSeen) {
     for (int i = 0; i < devices.count(); ++i) {
-        if (devices[i].nodeId == nodeId && devices[i].kind == NodeKind::Sensor) {
+        if (devices[i].addr == addr && devices[i].kind == NodeKind::Sensor) {
             devices[i].data.sensor = { humi, temp, lux, soil, motion, battery }; 
             devices[i].lastSeen = lastSeen;
             devices[i].status = 1;
@@ -209,54 +269,55 @@ void DeviceModel::updateSensorData(const QString& nodeId, float temp, float humi
     }
 }
 
-void DeviceModel::updateActuatorStatus(const QString& nodeId, int actuatorType, float setpoint, int status, quint64 lastSeen) {
+void DeviceModel::updateActuatorStatus(const uint16_t &addr, int actuatorType, float setpoint, int status, quint64 lastSeen) {
     for (int i = 0; i < devices.count(); ++i) {
-        if (devices[i].nodeId == nodeId && devices[i].kind == NodeKind::Actuator) {
+        if (devices[i].addr == addr && devices[i].kind == NodeKind::Actuator) {
             devices[i].data.actuator.actuatorType = actuatorType;
             devices[i].data.actuator.currentSetpoint = setpoint;
             devices[i].data.actuator.setState = status;
             devices[i].lastSeen = lastSeen;
             devices[i].status = 1;
             emit dataChanged(index(i), index(i), {CurrentSetpointRole, ActuatorStateRole, StatusRole});
+            setPending(addr, false);
             emit deviceCountChanged();
             return;
         }
     }
 }
 
-void DeviceModel::onProvisionSuccess(const QString& nodeId, const QString& name, const QString &uuid, uint16_t unicast, uint16_t addr, uint16_t modelId, uint16_t companyId) {
+void DeviceModel::onProvisionSuccess(const uint16_t &addr, const QString& name, const QString &uuid, uint16_t unicast, uint16_t modelId, uint16_t companyId) {
     deleteUnprovDevice(uuid);
 
     NodeKind kind = nodeKindFromModel(companyId, modelId);
 
     int currentActuatorType = 0;
-    QString defaultName = QString("Node %1").arg(nodeId);
+    QString defaultName = QString("Node %1").arg(addr);
 
     if (kind == NodeKind::Sensor) {
-        defaultName = QString("Sensor %1").arg(nodeId);
+        defaultName = QString("Sensor %1").arg(addr);
     }
     else if (kind == NodeKind::Actuator) {
         if (modelId == VND_MODEL_ID_ACTUATOR_AC) {
             currentActuatorType = 3;
-            defaultName = QString("AirConditioner %1").arg(nodeId);
+            defaultName = QString("AirConditioner %1").arg(addr);
         }
         else if (modelId == VND_MODEL_ID_ACTUATOR_LIGHT) {
             currentActuatorType = 2;
-            defaultName = QString("Light %1").arg(nodeId);
+            defaultName = QString("Light %1").arg(addr);
         }
         else if (modelId == VND_MODEL_ID_ACTUATOR_RELAY) {
             currentActuatorType = 1;
-            defaultName = QString("Relay (Switch) %1").arg(nodeId);
+            defaultName = QString("Relay (Switch) %1").arg(addr);
         }
         else {
-            defaultName = QString("Actuator %1").arg(nodeId);
+            defaultName = QString("Actuator %1").arg(addr);
         }
     }
 
     QString finalName = name.isEmpty() ? defaultName : name;
 
     for (int i = 0; i < devices.count(); ++i) {
-        if (devices[i].nodeId == nodeId) {
+        if (devices[i].addr == addr) {
             devices[i].name = finalName;
             devices[i].uuid = uuid;
             devices[i].unicast = unicast;
@@ -276,10 +337,10 @@ void DeviceModel::onProvisionSuccess(const QString& nodeId, const QString& name,
     }
 
     deviceInfo newDev;
-    newDev.nodeId = nodeId;
     newDev.uuid = uuid;
     newDev.addr = addr;
     newDev.kind = kind;
+    newDev.unicast = unicast;
     newDev.name = finalName;
     newDev.model_id = modelId;
     newDev.company_id = companyId;
@@ -299,16 +360,16 @@ void DeviceModel::onProvisionSuccess(const QString& nodeId, const QString& name,
 
 
 
-void DeviceModel::deleteDeviceById(const QString& nodeId) {
-    for (int i = 0; i < devices.count(); ++i) {
-        if (devices[i].nodeId == nodeId) {
+void DeviceModel::deleteDeviceByUnicast(const uint16_t &unicast) {
+    if (unicast == 0) return;
+    for (int i = devices.count() - 1; i >= 0; --i) {
+        if (devices[i].unicast == unicast) {
             beginRemoveRows(QModelIndex(), i, i);
             devices.removeAt(i);
             endRemoveRows();
-            emit deviceCountChanged();
-            return;
         }
     }
+    emit deviceCountChanged();
 }
 
 void DeviceModel::addUnprovDev(const unProvisionDevice& device) {

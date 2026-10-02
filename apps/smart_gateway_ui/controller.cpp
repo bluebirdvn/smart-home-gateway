@@ -3,6 +3,7 @@
 #include "ipcevent.h"
 #include <QDateTime>
 #include <QDebug>
+#include <cstdint>
 
 Controller::Controller(IPCEvent* ipcEvent, DeviceModel* model, LogModel* logModel, QObject *parent)
     : QObject(parent), device_models(model), log_model(logModel)
@@ -41,12 +42,15 @@ Controller::Controller(IPCEvent* ipcEvent, DeviceModel* model, LogModel* logMode
     });
 
     connect(ipcEvent, &IPCEvent::heartbeatReceive, this, [this](HeartbeatDto dto) {
-        if (dto.is_online == true) {
+    if (dto.is_online) {
+        device_models->markOnline(dto.unicast, dto.features, QDateTime::currentMSecsSinceEpoch());
+    } else {
+        device_models->markOffline(dto.unicast);
+    }
+    });
 
-            device_models->markOnline(dto.node_id, dto.features, 0);
-        } else {
-            device_models->markOffline(dto.node_id);
-        }
+    connect(device_models, &DeviceModel::pendingTimedOut, this, [this](int addr) {
+        log_model->appendLog("ERR", "ACT", QString("no feedback from 0x%1 after 5s").arg(addr, 4, 16, QChar('0')));
     });
 
     connect(this, &Controller::reqSendActuator, ipcEvent, &IPCEvent::sendActuatorCmd);
@@ -63,12 +67,12 @@ Controller::Controller(IPCEvent* ipcEvent, DeviceModel* model, LogModel* logMode
 }
 
 void Controller::onNodesSynced(const NodeInfoDto &dto) {
-    device_models->onProvisionSuccess(dto.node_id, dto.name, dto.uuid, dto.unicast, dto.element_addr, dto.model_id, dto.company_id);
+    device_models->onProvisionSuccess(dto.element_addr, dto.name, dto.uuid, dto.unicast, dto.model_id, dto.company_id);
 }
 
 void Controller::onSensorsSynced(const SensorDto &dto) {
     device_models->updateSensorData(
-        dto.node_id,
+        dto.element_addr,
         static_cast<float>(dto.temperature),
         static_cast<float>(dto.humidity),
         static_cast<float>(dto.soil_moisture),
@@ -81,7 +85,7 @@ void Controller::onSensorsSynced(const SensorDto &dto) {
 
 void Controller::onActuatorsSynced(const ActuatorStatusDto &dto) {
     device_models->updateActuatorStatus(
-        dto.node_id,
+        dto.element_addr,
         dto.actuator_type,
         static_cast<float>(dto.present_setpoint),
         dto.status,
@@ -109,21 +113,31 @@ void Controller::provisionDevice(const QString &uuid, int32_t bearer) {
     log_model->appendLog("OUT", "PROV", QString("uuid=%1").arg(uuid));
 }
 
-void Controller::setActuatorManual(const QString &nodeId, int deviceType, bool state) {
+void Controller::setActuatorManual(const uint16_t &addr, bool state) {
     ActuatorCmdDto dto;
-    dto.node_id = nodeId;
-    dto.element_addr = device_models->getNodeAddr(nodeId);
-    dto.actuator_type = device_models->getDeviceType(nodeId); 
-    dto.device_type   = device_models->getDeviceType(nodeId);
-    dto.device_type = deviceType;
-    dto.onoff = state;
+    dto.element_addr = addr;
+    dto.actuator_type = device_models->getDeviceType(addr);
+    dto.device_type   = device_models->getDeviceType(addr);
+    dto.setpoint      = 0;
+    dto.status        = state ? 1 : 0;
+    dto.onoff         = state;
+    device_models->setPending(addr, true);
     emit reqSendActuator(dto);
+    log_model->appendLog("OUT", "ACT", QString("addr=0x%1 on=%2").arg(addr, 4, 16, QChar('0')).arg(state));
 }
 
-void Controller::removeNode(const QString &nodeId) {
+void Controller::removeNode(const uint16_t &addr) {
+    const uint16_t unicast = device_models->getUnicastByAddr(addr);
+    if (unicast == 0) {
+        log_model->appendLog("ERR", "DELNODE", QString("addr=0x%1 has no unicast").arg(addr, 4, 16, QChar('0')));
+        return;
+    }
     DeleteNodeDto dto;
-    dto.node_id = nodeId;
+    dto.addr     = unicast;                          
+    dto.uuid_hex = device_models->getNodeUuid(addr);
+    log_model->appendLog("OUT", "DELNODE", QString("unicast=0x%1").arg(unicast, 4, 16, QChar('0')));
     emit reqDeleteNode(dto);
+    device_models->deleteDeviceByUnicast(unicast);
 }
 
 void Controller::createNewGroup(const QString &groupName) {
@@ -137,18 +151,19 @@ void Controller::deleteGroup(int groupId) {
     emit sigDeleteGroup(groupId);
 }
 
-void Controller::addDeviceToGroup(int groupId, int unicast, bool isSensor) {
-    if (!groups_config.contains(groupId)) {
-        return;
-    }
+void Controller::addDeviceToGroup(int groupId, int addr, bool isSensor) {
+    if (!groups_config.contains(groupId)) return;
     auto& group = groups_config[groupId];
+    const uint16_t a = static_cast<uint16_t>(addr);
+    if (isSensor) group.sensorAddrs.insert(a); else group.actuatorAddrs.insert(a);
+    emit groupsChanged();
+}
 
-    if (isSensor) {
-        group.sensorNodeIds.insert(unicast);
-    } else {
-        group.actuatorNodeIds.insert(unicast);
-    }
-
+void Controller::removeDeviceFromGroup(int groupId, int addr, bool isSensor) {
+    if (!groups_config.contains(groupId)) return;
+    auto& group = groups_config[groupId];
+    const uint16_t a = static_cast<uint16_t>(addr);
+    if (isSensor) group.sensorAddrs.remove(a); else group.actuatorAddrs.remove(a);
     emit groupsChanged();
 }
 
@@ -204,48 +219,44 @@ QVariantList Controller::getAutomationGroups() const {
         map["thresholdOn"] = g.thresholdOn;
         map["thresholdOff"] = g.thresholdOff;
 
-        auto toQVariantList = [](const QSet<int>& set) {
+        auto toQVariantList = [](const QSet<uint16_t>& set) {
             QVariantList vl;
-            for (int v : set) {
-                vl.append(v);
-            }
+            for (uint16_t v : set) vl.append(static_cast<int>(v));
             return vl;
         };
 
-        map["sensors"] = toQVariantList(g.sensorNodeIds);
-        map["actuators"] = toQVariantList(g.actuatorNodeIds);
-        map["syncedSensors"] = toQVariantList(g.syncedSensorIds);
-        map["syncedActuators"] = toQVariantList(g.syncedActuatorIds);
+        map["sensors"]         = toQVariantList(g.sensorAddrs);
+        map["actuators"]       = toQVariantList(g.actuatorAddrs);
+        map["syncedSensors"]   = toQVariantList(g.syncedSensorAddrs);
+        map["syncedActuators"] = toQVariantList(g.syncedActuatorAddrs);
         list.append(map);
     }
     return list;
 }
 
 
-void Controller::setAcManual(const QString &nodeId, bool power, int mode, int fan, int temp) {
+void Controller::setAcManual(const uint16_t &addr, bool power, int mode, int fan, int temp) {
     const uint8_t status = (power ? 0x01 : 0x00) | ((mode & 0x03) << 1) | ((fan & 0x03) << 3);
 
     ActuatorCmdDto dto;
-    dto.node_id       = nodeId;
-    dto.element_addr  = device_models->getNodeAddr(nodeId);
-    dto.actuator_type = device_models->getDeviceType(nodeId);
+    dto.element_addr = addr;
+    dto.actuator_type = device_models->getDeviceType(addr);
     dto.setpoint      = qBound(16, temp, 30);
-    dto.device_type   = device_models->getDeviceType(nodeId);
+    dto.device_type   = device_models->getDeviceType(addr);
     dto.status        = status;
     dto.onoff         = power;
     emit reqSendActuator(dto);
-    log_model->appendLog("OUT", "AC", QString("node=%1 status=0x%2 temp=%3").arg(nodeId).arg(status, 2, 16, QChar('0')).arg(temp));
+    log_model->appendLog("OUT", "AC", QString("addr=0x%1 status=0x%2 temp=%3").arg(addr, 4, 16, QChar('0')).arg(status, 2, 16, QChar('0')).arg(temp));
 }
 
-void Controller::setLightManual(const QString &nodeId, bool on, int brightness) {
+void Controller::setLightManual(const uint16_t &addr, bool on, int brightness) {
     ActuatorCmdDto dto;
-    dto.node_id       = nodeId;
-    dto.element_addr  = device_models->getNodeAddr(nodeId);
-    dto.actuator_type = device_models->getDeviceType(nodeId);
+    dto.element_addr = addr;
+    dto.actuator_type = device_models->getDeviceType(addr);
     dto.setpoint      = on ? qBound(0, brightness, 100) : 0;
-    dto.device_type   = device_models->getDeviceType(nodeId);
+    dto.device_type   = device_models->getDeviceType(addr);
     dto.status        = on ? 1 : 0;
     dto.onoff         = on;
     emit reqSendActuator(dto);
-    log_model->appendLog("OUT", "LIGHT", QString("node=%1 on=%2 bright=%3").arg(nodeId).arg(on).arg(brightness));
+    log_model->appendLog("OUT", "LIGHT", QString("addr=0x%1 on=%2 bright=%3").arg(addr, 4, 16, QChar('0')).arg(on).arg(brightness));
 }
