@@ -13,7 +13,9 @@ option(BUILD_DATABASE "Build Local Database" OFF)
 option(BUILD_MQTT "Build MQTT Connect" OFF)
 option(BUILD_UI "Build Qt UI" OFF)
 
-add_subdirectory(common)
+if(BUILD_GATEWAY OR BUILD_DATABASE OR BUILD_MQTT)
+    add_subdirectory(common)
+endif()
 
 if(BUILD_GATEWAY)
     add_subdirectory(gateway-daemon)
