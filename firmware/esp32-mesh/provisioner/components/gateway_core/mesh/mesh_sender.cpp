@@ -1,6 +1,6 @@
 #include "mesh_sender.hpp"
 #include <cstring>
-
+#include "esp_log.h"
 MeshCommandSender::MeshCommandSender(std::shared_ptr<ReliableTransport> transport, std::shared_ptr<FrameCodec> codec)
     : transport(transport), codec(codec) {}
 
@@ -24,6 +24,7 @@ void MeshCommandSender::unprov_device_adv(const mesh_evt_unprov_adv_t& unprov_de
 
 void MeshCommandSender::prov_complete(uint16_t addr, const mesh_evt_prov_complete_t& prov_data)
 {
+    ESP_LOGI("MeshCommandSender", "Provisioning complete for device 0x%04X", addr);
     send_struct(OpCode::EVT_PROV_COMPLETE, addr, prov_data);
 }
 

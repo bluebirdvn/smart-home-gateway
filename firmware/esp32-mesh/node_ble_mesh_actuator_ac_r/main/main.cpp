@@ -111,6 +111,28 @@ static void prov_complete(uint16_t net_idx, uint16_t addr, uint8_t flags, uint32
     s_net_idx = net_idx;
 }
 
+void get_mesh_status(esp_ble_mesh_model_t *model) {
+    if (!esp_ble_mesh_node_is_provisioned()) {
+        ESP_LOGI(TAG, "Node is not provisioned yet.");
+        return;
+    }
+
+    uint16_t primary_addr = esp_ble_mesh_get_primary_element_address();
+    uint16_t elem_idx = model->element->element_addr - primary_addr;
+
+    uint16_t app_idx = model->keys[0];
+    uint16_t pub_addr = ESP_BLE_MESH_ADDR_UNASSIGNED;
+    if (model->pub) {
+        pub_addr = model->pub->publish_addr;
+    }
+
+    for (int i = 0; i < CONFIG_BLE_MESH_MODEL_KEY_COUNT; ++i) {
+        if (model->groups[i] != ESP_BLE_MESH_ADDR_UNASSIGNED) {
+            ESP_LOGI(TAG, "Model is subscribed to group address: 0x%04x", model->groups[i]);
+        }
+    }
+}
+
 static void example_ble_mesh_provisioning_cb(esp_ble_mesh_prov_cb_event_t event,
                                               esp_ble_mesh_prov_cb_param_t *param)
 {
@@ -269,87 +291,52 @@ extern "C" void vendor_model_cb(esp_ble_mesh_model_cb_event_t event, esp_ble_mes
 
 static void sensor_task(void *arg) {
     while (true) {
-        if (sensors_mng) {
+        if (esp_ble_mesh_node_is_provisioned() && sensors_mng) {
             sensor_data_t data = {};
-            if (sensors_mng->readAll(data)) {
+            if (!sensors_mng->readAll(data)) {
+                data.temperature = 26;
+                data.humidity = 65;
+                data.lux = 400;
+                data.battery = 99;
+            }
+
+            esp_ble_mesh_model_t *model = &sensor_models[0];
+            uint16_t app_idx = model->keys[0];
+
+            if (app_idx != ESP_BLE_MESH_KEY_UNUSED) {
                 
-                uint16_t my_sensor_addr = esp_ble_mesh_get_primary_element_address() + 1;
-                uint16_t dst_addr = my_sensor_addr; 
-                actuators_mng.process_sensor_update(my_sensor_addr, dst_addr, data);
+                if (model->pub && model->pub->publish_addr != ESP_BLE_MESH_ADDR_UNASSIGNED) {
+                    esp_err_t err = esp_ble_mesh_model_publish(
+                        model,
+                        VND_OP_SENSOR_STATUS,
+                        sizeof(data),
+                        (uint8_t *)&data,
+                        ROLE_NODE
+                    );
+                    ESP_LOGI(TAG, "Published to 0x%04x, result: %s", 
+                             model->pub->publish_addr, esp_err_to_name(err));
+                } 
+                else {
+                    uint16_t target_dst = (provisioner_addr != ESP_BLE_MESH_ADDR_UNASSIGNED) ? provisioner_addr : 0x0001;
 
-                if (s_app_idx != ESP_BLE_MESH_KEY_UNUSED) {
-                    uint16_t pub_addr = sensor_pub.publish_addr; 
-                    if (pub_addr != ESP_BLE_MESH_ADDR_UNASSIGNED) {
-                        esp_ble_mesh_msg_ctx_t ctx = {
-                            .net_idx = s_net_idx,
-                            .app_idx = s_app_idx,
-                            .addr = pub_addr,
-                            .send_ttl = ESP_BLE_MESH_TTL_DEFAULT,
-                        };
-                        esp_ble_mesh_server_model_send_msg(&sensor_models[0], &ctx, VND_OP_SENSOR_STATUS, sizeof(data), (uint8_t *)&data);
-                    }
-                }
-
-                if (provisioner_addr != ESP_BLE_MESH_ADDR_UNASSIGNED) {
                     esp_ble_mesh_msg_ctx_t ctx = {
                         .net_idx = s_net_idx,
-                        .app_idx = s_app_idx,
-                        .addr = provisioner_addr,
+                        .app_idx = app_idx,      
+                        .addr = target_dst,
                         .send_ttl = ESP_BLE_MESH_TTL_DEFAULT,
                     };
-                    esp_ble_mesh_server_model_send_msg(&sensor_models[0], &ctx, VND_OP_SENSOR_STATUS, sizeof(data), (uint8_t *)&data);
-                }
 
+                    esp_err_t err = esp_ble_mesh_server_model_send_msg(
+                        model,
+                        &ctx,
+                        VND_OP_SENSOR_STATUS,
+                        sizeof(data),
+                        (uint8_t *)&data
+                    );
+                    ESP_LOGI(TAG, "Sent Unicast to 0x%04x, result: %s", target_dst, esp_err_to_name(err));
+                }
             } else {
-                ESP_LOGI(TAG, "using simulation data");
-                static int8_t   sim_temp = 25;   
-                static uint8_t  sim_hum  = 60;   
-                static uint16_t sim_lux  = 500;   
-                static uint8_t  sim_battery = 100;
-                sim_temp += (rand() % 3) - 1;
-                if (sim_temp > 35) sim_temp = 35;
-                if (sim_temp < 16) sim_temp = 16;
-
-                sim_hum += (rand() % 5) - 2;
-                if (sim_hum > 90) sim_hum = 90;
-                if (sim_hum < 40) sim_hum = 40;
-
-                int lux_change = (rand() % 101) - 50; 
-                if ((int)sim_lux + lux_change > 2000) sim_lux = 2000;
-                else if ((int)sim_lux + lux_change < 10) sim_lux = 10;
-                else sim_lux += lux_change;
-
-                uint8_t sim_motion = (rand() % 100 < 10) ? 1 : 0;
-
-                if (rand() % 5 == 0) sim_battery--;
-                if (sim_battery < 10) sim_battery = 100;
-
-                data.temperature = sim_temp;
-                data.humidity = sim_hum;
-                data.lux = sim_lux;
-                data.motion = sim_motion;
-                data.soil_moisture = 45; 
-                data.battery = sim_battery;
-                uint16_t pub_addr = sensor_pub.publish_addr; 
-                if (pub_addr != ESP_BLE_MESH_ADDR_UNASSIGNED) {
-                    esp_ble_mesh_msg_ctx_t ctx = {
-                        .net_idx = s_net_idx,
-                        .app_idx = s_app_idx,
-                        .addr = pub_addr,
-                        .send_ttl = ESP_BLE_MESH_TTL_DEFAULT,
-                    };
-                    esp_ble_mesh_server_model_send_msg(&sensor_models[0], &ctx, VND_OP_SENSOR_STATUS, sizeof(data), (uint8_t *)&data);
-                }
-
-                if (provisioner_addr != ESP_BLE_MESH_ADDR_UNASSIGNED) {
-                    esp_ble_mesh_msg_ctx_t ctx = {
-                        .net_idx = s_net_idx,
-                        .app_idx = s_app_idx,
-                        .addr = provisioner_addr,
-                        .send_ttl = ESP_BLE_MESH_TTL_DEFAULT,
-                    };
-                    esp_ble_mesh_server_model_send_msg(&sensor_models[0], &ctx, VND_OP_SENSOR_STATUS, sizeof(data), (uint8_t *)&data);
-                }
+                ESP_LOGW(TAG, "can't send message because model is not binded to any appkey");
             }
         }
         vTaskDelay(pdMS_TO_TICKS(SENSOR_PERIODIC_INTERVAL_MS));
