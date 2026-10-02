@@ -610,7 +610,11 @@ public:
         return [repos, ipc](const IpcMessage& msg) {
             std::cout << "Received DeleteGroupCmd: " << msg.payload << "\n";
             try {
-                int groupId = JsonUse::get_int(msg.payload, "groupId");
+                JsonUse::CJsonGuard root(msg.payload);
+                int groupId = static_cast<int>(JsonUse::get_int(root.ptr, "groupId", -1));
+                if (groupId == -1) {
+                    return;
+                }
                 
                 if (auto group_info = repos->group->findById(groupId)) {
                     auto existing_members = repos->group_member->findByGroupId(groupId);
