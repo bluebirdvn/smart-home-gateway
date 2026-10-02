@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS actuator (
     threshold_on     REAL NOT NULL DEFAULT 0,
     threshold_off    REAL NOT NULL DEFAULT 0,
     threshold_type   INTEGER NOT NULL DEFAULT 0,
-    updated_at       INTEGER NOT NULL DEFAULT (unixepoch()),
+    updated_at       INTEGER NOT NULL DEFAULT (unixepoch())
 );
 
 CREATE TABLE IF NOT EXISTS mesh_group (
