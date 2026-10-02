@@ -325,7 +325,7 @@ public:
             return;
         }
         const std::string& p = m.payload;
-        std::string action = jutil::get_str(p, "action");
+        std::string action = JsonUse::get_str(p, "action");
 
         try {
             JsonUse::CJsonGuard root(m.payload);

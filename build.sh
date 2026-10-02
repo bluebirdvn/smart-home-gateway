@@ -139,6 +139,8 @@ EXTERNALSRC:pn-ui-app             = "/workdir/apps"
 EXTERNALSRC:pn-apps-config        = "/workdir/apps/configs"
 EOF
 
+bitbake -c cleansstate gateway-app local-database-app mqtt-connect ui-app
+
 echo "configuration complete"
 echo "start build image"
 

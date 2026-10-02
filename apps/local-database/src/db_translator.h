@@ -51,6 +51,25 @@ namespace sync_json {
         o << "]";
         return o.str();
     }
+    static std::string display_name(const Node& n) {
+        if (!n.name.empty() && n.name.find("Node ") != 0 && n.name != "unknown" && n.name != "sensor" && n.name != "actuator") {
+            return n.name;
+        }
+
+        char suffix[16];
+        std::snprintf(suffix, sizeof(suffix), " %04X", n.element_addr);
+        std::string suf_str(suffix);
+
+        switch (n.model_id) {
+            case VND_MODEL_ID_SENSOR:         return "Sensor" + suf_str;
+            case VND_MODEL_ID_ACTUATOR:       return "Actuator" + suf_str;
+            case VND_MODEL_ID_ACTUATOR_AC:    return "Air Conditioner" + suf_str;
+            case VND_MODEL_ID_ACTUATOR_LIGHT: return "Light" + suf_str;
+            case VND_MODEL_ID_ACTUATOR_RELAY: return "Relay" + suf_str;
+            default:                          return "Node" + suf_str;
+        }
+    }
+
 
     inline std::string node_sync(std::shared_ptr<AppRepositories> repos) {
         cJSON* root = cJSON_CreateObject();
@@ -147,26 +166,6 @@ namespace sync_json {
         cJSON_AddNumberToObject(obj, "battery", s.battery);
         cJSON_AddNumberToObject(obj, "status", 1);
         return JsonUse::to_string(obj);
-    }
-    
-
-    static std::string display_name(const Node& n) {
-        if (!n.name.empty() && n.name.find("node_") != 0 && n.name != "unknown") {
-            return n.name;
-        }
-
-        char suffix[16];
-        std::snprintf(suffix, sizeof(suffix), " %04X", n.element_addr);
-        std::string suf_str(suffix);
-
-        switch (n.model_id) {
-            case VND_MODEL_ID_SENSOR:         return "Sensor" + suf_str;
-            case VND_MODEL_ID_ACTUATOR:       return "Actuator" + suf_str;
-            case VND_MODEL_ID_ACTUATOR_AC:    return "Air Conditioner" + suf_str;
-            case VND_MODEL_ID_ACTUATOR_LIGHT: return "Light" + suf_str;
-            case VND_MODEL_ID_ACTUATOR_RELAY: return "Relay" + suf_str;
-            default:                          return n.node_id;
-        }
     }
 }
 
@@ -406,7 +405,7 @@ public:
             try {
                 std::cout << "Received DeleteNodeCmd: " << msg.payload << "\n";
                 auto dto = DeleteNodeDto::from_json(msg.payload);
-                repos->node->deleteByUnicast(dto.unicast);
+                repos->node->deleteByUnicast(dto.addr);
                 
                 if (ipc) {
                     make_ui_sync_all_nodes_handler(repos, ipc)(IpcMessage{});
@@ -611,7 +610,7 @@ public:
         return [repos, ipc](const IpcMessage& msg) {
             std::cout << "Received DeleteGroupCmd: " << msg.payload << "\n";
             try {
-                int groupId = jutil::get_int(msg.payload, "groupId");
+                int groupId = JsonUse::get_int(msg.payload, "groupId");
                 
                 if (auto group_info = repos->group->findById(groupId)) {
                     auto existing_members = repos->group_member->findByGroupId(groupId);

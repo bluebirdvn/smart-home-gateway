@@ -2,7 +2,7 @@
 
 #include "mqtt_translator.h"
 #include "ipc_dto.h"
-#include "json_use.h"
+#include "cjson_use.h"
 #include "mqtt_connection_config.h"
 #include "ipc_message.h"
 #include "ipc.h"

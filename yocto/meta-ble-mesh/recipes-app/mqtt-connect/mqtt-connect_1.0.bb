@@ -6,7 +6,7 @@ LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda
 SRC_URI = "git://github.com/bluebirdvn/smart-home-gateway.git;protocol=https;branch=main"
 SRCREV = "${AUTOREV}"
 DEPENDS = "glib-2.0 dbus paho-mqtt-c"
-
+DEPENDS += "cjson"
 S = "${WORKDIR}/git/apps"
 inherit cmake pkgconfig
 
