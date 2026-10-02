@@ -43,7 +43,7 @@ void Provisioning::onProvComplete(const MeshFrame& f)
     }
 
     std::string uuid_hex = MeshUtils::bytes_to_hex(p->uuid, 16);
-    std::cout << "ProvComplete node=0x" << std::hex << f.addr << " elem=" << (int)p->elem_num << " uuid=" << uuid_hex << "\n";
+    std::cout << "ProvComplete node=0x" << std::hex << p->element_addr << " unicast=0x" << std::hex << f.addr << " elem=" << (int)p->elem_num << " uuid=" << uuid_hex << "\n";
 
     node_registry->register_node(f.addr, p->elem_num);
     
