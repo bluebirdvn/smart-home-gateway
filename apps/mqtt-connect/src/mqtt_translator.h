@@ -18,7 +18,6 @@
 
 /**
  * @brief define all topic for publish and subscribe
- * 
  */
 namespace MqttTopic {
 
@@ -30,8 +29,6 @@ namespace MqttTopic {
 
 /**
  * @brief publish topic
- * 
- * @return std::string 
  */
     inline std::string pub_mesh_status() { 
         return "gateway/mesh/status"; 
@@ -70,8 +67,6 @@ namespace MqttTopic {
     }
 /**
  * @brief subscribe topic
- * 
- * @return std::string 
  */
     inline std::string sub_set_auto_cmd() { 
         return "gateway/nodes/+/mode"; 
@@ -108,7 +103,7 @@ namespace MqttTopic {
         return "gateway/commands/sync_groups"; 
     }
 
-    inline std::string extract_element_addr(const std::string& topic) {
+    inline uint16_t extract_element_addr(const std::string& topic) {
         const std::string prefix = "nodes/";
         auto s = topic.find(prefix);
         if (s == std::string::npos) return 0;
@@ -149,7 +144,6 @@ private:
     std::shared_ptr<MQTTClient> client;
     
     static constexpr const char* GW_ID = "GW_CORE_001";
-
 
     std::string wrap_message_to_pattern(const std::string& type, const std::string& payload_json) {
         auto now   = std::chrono::system_clock::now();
@@ -196,7 +190,7 @@ public:
         try {
             std::cout << "Received MeshStatus: " << msg.payload << "\n";
             auto dto = ModuleStatusDto::from_ipc(msg);
-            mqtt_publish(MqttTopic::mesh_status(), "mesh_status", dto.to_json(), QOS_1_AT_LEAST_ONCE, true);
+            mqtt_publish(MqttTopic::pub_mesh_status(), "mesh_status", dto.to_json(), QOS_1_AT_LEAST_ONCE, true);
         } catch (const std::exception& e) { 
             std::cerr << "MQTT Pub error: " << e.what() << "\n"; 
         }
@@ -207,7 +201,7 @@ public:
         try {
             std::cout << "Received GatewayStatus: " << msg.payload << "\n";
             auto dto = ModuleStatusDto::from_ipc(msg);
-            mqtt_publish(MqttTopic::gateway_status(), "module_status", dto.to_json(), QOS_1_AT_LEAST_ONCE, true);
+            mqtt_publish(MqttTopic::pub_gateway_status(), "module_status", dto.to_json(), QOS_1_AT_LEAST_ONCE, true);
         } catch (const std::exception& e) { 
             std::cerr << "MQTT Pub error: " << e.what() << "\n"; 
         }
@@ -269,7 +263,7 @@ public:
         try {
             std::cout << "Received UnprovAdvEvent: " << msg.payload << "\n";
             auto dto = UnprovAdvDto::from_ipc(msg);
-            mqtt_publish(MqttTopic::unprov_adv(), "discovery", dto.to_json(), QOS_0_AT_MOST_ONCE);
+            mqtt_publish(MqttTopic::pub_unprov_adv(), "discovery", dto.to_json(), QOS_0_AT_MOST_ONCE);
         } catch (const std::exception& e) { 
             std::cerr << "MQTT Pub error: " << e.what() << "\n"; 
         }
@@ -277,12 +271,12 @@ public:
 
     void handle_group_sync_status(const IpcMessage& msg) {
         std::cout << "Received GroupSyncEvent: " << msg.payload << "\n";
-        mqtt_publish(MqttTopic::sync_groups_status(), "group_sync", msg.payload, QOS_1_AT_LEAST_ONCE, true);
+        mqtt_publish(MqttTopic::pub_sync_groups_status(), "group_sync", msg.payload, QOS_1_AT_LEAST_ONCE, true);
     }
 
     void handle_node_sync_status(const IpcMessage& msg) {
         std::cout << "Received NodeSyncEvent: " << msg.payload << "\n";
-        mqtt_publish(MqttTopic::sync_nodes_status(), "node_sync", msg.payload, QOS_1_AT_LEAST_ONCE, true);
+        mqtt_publish(MqttTopic::pub_sync_nodes_status(), "node_sync", msg.payload, QOS_1_AT_LEAST_ONCE, true);
     }
 
 
@@ -300,19 +294,20 @@ public:
     }
 
     void handle_actuator_command(const MQTTMessage& m) {
-        std << "Received ActuatorCmd: " << m.payload << "\n";
+        std::cout << "Received ActuatorCmd: " << m.payload << "\n";
         uint16_t addr = MqttTopic::extract_element_addr(m.topic);
         if (addr == 0) {
-
             return;
         }
         try {
-            dto.element_addr = addr;
-            dto.group_addr   = static_cast<uint16_t>(JsonUse::get_int(root.ptr, "group_addr", 0));
-            dto.model_id     = static_cast<uint16_t>(JsonUse::get_int(root.ptr, "model_id", 0));
-            dto.company_id   = static_cast<uint16_t>(JsonUse::get_int(root.ptr, "company_id", 0xFFFF));
-            dto.is_sub       = true;
-            dto.is_add       = (action == "subscribe");
+            JsonUse::CJsonGuard root(m.payload);
+            ActuatorCmdDto dto;
+            dto.element_addr  = addr;
+            dto.actuator_type = static_cast<int32_t>(JsonUse::get_int(root.ptr, "actuator_type", 0));
+            dto.device_type   = static_cast<int32_t>(JsonUse::get_int(root.ptr, "device_type", 0));
+            dto.onoff         = JsonUse::get_bool(root.ptr, "onoff", false);
+            dto.setpoint      = JsonUse::get_double(root.ptr, "setpoint", 0.0);
+            publish_cmd("UiActuatorCmd", dto); 
         } catch (const std::exception& e) {
             std::cerr << " actuator_cmd error: " << e.what() << "\n";
         }
@@ -324,9 +319,7 @@ public:
         if (addr == 0) {
             return;
         }
-        const std::string& p = m.payload;
-        std::string action = JsonUse::get_str(p, "action");
-
+        
         try {
             JsonUse::CJsonGuard root(m.payload);
             std::string action = JsonUse::get_str(root.ptr, "action");
@@ -363,7 +356,7 @@ public:
     void handle_set_auto_command(const MQTTMessage& m) {
         std::cout << "Received SetAutoCmd: " << m.payload << "\n";
         uint16_t addr = MqttTopic::extract_element_addr(m.topic);
-        if (node_id.empty()) {
+        if (addr == 0) {
             return;
         }
         try {

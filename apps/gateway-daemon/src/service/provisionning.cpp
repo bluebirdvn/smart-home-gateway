@@ -24,7 +24,7 @@ void Provisioning::onRecvUnprovAdvPkt(const MeshFrame& f)
     if (!p || !ipc) {
         return;
     }
-    std::cout << "UnprovAdvPkt src=0x" << std::hex << f.addr << " rssi=" << std::dec << (int)((int8_t)p->rssi) << " bearer=" << std::dec << (int)p->bearer << " oob_info=0x" << std::hex << p->o
+    std::cout << "UnprovAdvPkt src=0x" << std::hex << f.addr << " rssi=" << std::dec << (int)((int8_t)p->rssi) << " bearer=" << std::dec << (int)p->bearer << " oob_info=0x" << std::hex << p->oob_info << "\n";
     std::string uuid_hex = MeshUtils::bytes_to_hex(p->uuid, 16);
 
     UnprovAdvDto adv;

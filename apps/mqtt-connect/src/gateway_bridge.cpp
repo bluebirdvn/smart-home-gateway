@@ -110,10 +110,11 @@ void GatewayBridge::subscribeTopics()
     mqtt_client->subscribe(MqttTopic::sub_cmd_threshold(), QOS_1_AT_LEAST_ONCE);
     mqtt_client->subscribe(MqttTopic::sub_cmd_provision(), QOS_1_AT_LEAST_ONCE);
     mqtt_client->subscribe(MqttTopic::sub_server_status(), QOS_1_AT_LEAST_ONCE);
-    mqtt_client->subscribe(MqttTopic::group_manage_cmd(),  QOS_1_AT_LEAST_ONCE);
-    mqtt_client->subscribe(MqttTopic::sync_nodes_cmd(),    QOS_1_AT_LEAST_ONCE);
-    mqtt_client->subscribe(MqttTopic::sync_groups_cmd(),   QOS_1_AT_LEAST_ONCE);
+    mqtt_client->subscribe(MqttTopic::sub_group_manage_cmd(),  QOS_1_AT_LEAST_ONCE); 
+    mqtt_client->subscribe(MqttTopic::sub_sync_nodes_cmd(),    QOS_1_AT_LEAST_ONCE); 
+    mqtt_client->subscribe(MqttTopic::sub_sync_groups_cmd(),   QOS_1_AT_LEAST_ONCE); 
 }
+
 
 MQTTConnectionConfig GatewayBridge::loadMqttConfig(const std::string& path)
 {

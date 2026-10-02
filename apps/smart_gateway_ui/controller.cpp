@@ -160,27 +160,19 @@ void Controller::addDeviceToGroup(int groupId, int addr, bool isSensor) {
 }
 
 void Controller::removeDeviceFromGroup(int groupId, int addr, bool isSensor) {
-    if (!groups_config.contains(groupId)) return;
-    auto& group = groups_config[groupId];
-    const uint16_t a = static_cast<uint16_t>(addr);
-    if (isSensor) group.sensorAddrs.remove(a); else group.actuatorAddrs.remove(a);
-    emit groupsChanged();
-}
-
-void Controller::removeDeviceFromGroup(int groupId, int unicast, bool isSensor) {
     if (!groups_config.contains(groupId)) {
         return;
     }
     auto& group = groups_config[groupId];
-
+    const uint16_t a = static_cast<uint16_t>(addr);
     if (isSensor) {
-        group.sensorNodeIds.remove(unicast);
+        group.sensorAddrs.remove(a);
     } else {
-        group.actuatorNodeIds.remove(unicast);
+        group.actuatorAddrs.remove(a);
     }
-
     emit groupsChanged();
 }
+
 
 void Controller::setGroupMode(int groupId, bool isAuto) {
     if (!groups_config.contains(groupId)) {
