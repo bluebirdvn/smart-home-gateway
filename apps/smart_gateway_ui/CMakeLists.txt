@@ -42,7 +42,6 @@ qt_add_qml_module(smart_gateway_ui
         config_manager.h
         dbus_event_adapter.h dbus_event_adapter.cpp 
         rpc.h rpc.cpp
-        mesh_utils.h
         mesh_vendor_id.h
         log_model.h
         dbus.h dbus.cpp
