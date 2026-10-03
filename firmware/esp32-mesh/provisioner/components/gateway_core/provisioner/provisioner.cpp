@@ -701,6 +701,7 @@ void Provisioner::ble_mesh_vendor_model_cb(esp_ble_mesh_model_cb_event_t event, 
 
 
 void Provisioner::handle_cmd_add_unprov_dev(const MeshFrame& f) {
+    ESP_LOGI(TAG, "Received CMD_ADD_UNPROV_DEV for addr 0x%04x", f.addr);
     mesh_cmd_add_unprov_dev_t cmd;
     if (!cmd.decode(f.payload)) {
         ESP_LOGE(TAG, "Payload too short for add_unprov_dev");
@@ -732,11 +733,13 @@ void Provisioner::handle_cmd_group_add(const MeshFrame& f) {
     if (err) {
         ESP_LOGE(TAG, "Model Subscription Add failed %d", err);
     }
+    ESP_LOGI(TAG, "Sent Model Subscription Add to 0x%04x for group 0x%04x", f.addr, cmd.group_addr);
 }
 
 void Provisioner::handle_cmd_group_delete(const MeshFrame& f) {
     if (!p_config_client) return;
 
+    ESP_LOGI(TAG, "Received CMD_GROUP_DELETE for addr 0x%04x", f.addr);
     mesh_cmd_remove_dev_from_group_t cmd;
     if (!cmd.decode(f.payload)) {
         ESP_LOGE(TAG, "Payload too short for group_delete");
@@ -753,11 +756,12 @@ void Provisioner::handle_cmd_group_delete(const MeshFrame& f) {
     
     esp_err_t err = esp_ble_mesh_config_client_set_state(&common, &set_state);
     if (err) ESP_LOGE(TAG, "Model Subscription Delete failed %d", err);
+    ESP_LOGI(TAG, "Sent Model Subscription Delete to 0x%04x for group 0x%04x", f.addr, cmd.group_addr);
 }
 
 void Provisioner::handle_cmd_model_pub_set(const MeshFrame& f) {
     if (!p_config_client) return;
-
+    ESP_LOGI(TAG, "Received CMD_MODEL_PUB_SET for addr 0x%04x", f.addr);
     mesh_cmd_model_pub_set_t cmd;
     if (!cmd.decode(f.payload)) {
         ESP_LOGE(TAG, "Payload too short for pub_set");
@@ -778,11 +782,12 @@ void Provisioner::handle_cmd_model_pub_set(const MeshFrame& f) {
     
     esp_err_t err = esp_ble_mesh_config_client_set_state(&common, &set_state);
     if (err) ESP_LOGE(TAG, "Model Publication Set failed %d", err);
+    ESP_LOGI(TAG, "Sent Model Publication Set to 0x%04x for model 0x%04x", f.addr, cmd.model_id);
 }
 
 void Provisioner::handle_cmd_sensor_get(const MeshFrame& f) {
     if (!p_sensor_client) return;
-
+    ESP_LOGI(TAG, "Received CMD_SENSOR_GET for addr 0x%04x", f.addr);
     mesh_cmd_sensor_get_t cmd;
     if (!cmd.decode(f.payload)) {
         ESP_LOGE(TAG, "Payload too short for sensor_get");
@@ -792,6 +797,7 @@ void Provisioner::handle_cmd_sensor_get(const MeshFrame& f) {
     uint16_t target_addr = f.addr;
     send_vendor_msg(target_addr, p_sensor_client->model, VND_OP_SENSOR_GET,
                      reinterpret_cast<const uint8_t*>(&cmd), sizeof(cmd));
+    ESP_LOGI(TAG, "Sent Sensor Get to 0x%04x", target_addr);
 }
 
 void Provisioner::handle_cmd_actuator_set(const MeshFrame& f) {
@@ -800,7 +806,8 @@ void Provisioner::handle_cmd_actuator_set(const MeshFrame& f) {
         ESP_LOGE(TAG, "Payload too short for actuator_set");
         return;
     }
-
+    ESP_LOGI(TAG, "Received CMD_ACTUATOR_SET for addr 0x%04x, device_type=%d, setpoint=%d, onoff=%d, status=%d",
+             f.addr, in.device_type, in.setpoint, in.onoff, in.status);
     vnd_actuator_set_t cmd;
     cmd.device_type = in.device_type;
     cmd.setpoint    = in.setpoint;
@@ -825,6 +832,8 @@ void Provisioner::handle_cmd_actuator_set(const MeshFrame& f) {
         send_vendor_msg(target_addr, target_client->model, opcode,
                         reinterpret_cast<const uint8_t*>(&cmd), sizeof(cmd));
     }
+
+    ESP_LOGI(TAG, "Sent Actuator Set to 0x%04x for device type %d", f.addr, cmd.device_type);
 }
 
 void Provisioner::handle_cmd_threshold_config(const MeshFrame& f) {
@@ -833,7 +842,8 @@ void Provisioner::handle_cmd_threshold_config(const MeshFrame& f) {
         ESP_LOGE(TAG, "Payload too short for threshold_config");
         return;
     }
-
+    ESP_LOGI(TAG, "Received CMD_THRESHOLD_CONFIG for addr 0x%04x, actuator_type=%d, threshold_on=%d, threshold_off=%d, type=%d",
+             f.addr, in.actuator_type, in.threshold_on, in.threshold_off, in.type);
     vnd_sensor_threshold_t cmd = {
         .src_addr      = in.src_addr,
         .threshold_on  = in.threshold_on,
@@ -855,6 +865,8 @@ void Provisioner::handle_cmd_threshold_config(const MeshFrame& f) {
         send_vendor_msg(target_addr, target_client->model, VND_OP_SENSOR_THRESHOLD_SET,
                          reinterpret_cast<const uint8_t*>(&cmd), sizeof(cmd));
     }
+
+    ESP_LOGI(TAG, "Sent Threshold Config to 0x%04x for actuator type %d", f.addr, in.actuator_type);
 }
 
 void Provisioner::handle_cmd_set_auto(const MeshFrame& f) {
@@ -863,7 +875,8 @@ void Provisioner::handle_cmd_set_auto(const MeshFrame& f) {
         ESP_LOGE(TAG, "Payload too short for set_auto");
         return;
     }
-
+    ESP_LOGI(TAG, "Received CMD_SET_AUTO for addr 0x%04x, type=%d, is_auto=%d",
+             f.addr, in.type, in.is_auto);
     vnd_actuator_auto_t cmd;
     cmd.is_auto = in.is_auto;
     
@@ -881,6 +894,7 @@ void Provisioner::handle_cmd_set_auto(const MeshFrame& f) {
         send_vendor_msg(target, target_client->model, VND_OP_ACTUATOR_SET_AUTO,
                          reinterpret_cast<const uint8_t*>(&cmd), sizeof(cmd));
     }
+    ESP_LOGI(TAG, "Sent Set Auto to 0x%04x for device type %d", f.addr, in.type);
 }
 
 
