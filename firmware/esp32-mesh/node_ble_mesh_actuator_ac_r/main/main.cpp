@@ -290,26 +290,30 @@ extern "C" void vendor_model_cb(esp_ble_mesh_model_cb_event_t event, esp_ble_mes
 }
 
 static void sensor_task(void *arg) {
+    static sensor_data_t data = {}; 
+
     while (true) {
         if (esp_ble_mesh_node_is_provisioned() && sensors_mng) {
-            sensor_data_t data = {};
+            
             if (!sensors_mng->readAll(data)) {
                 data.temperature = 26;
                 data.humidity = 65;
                 data.lux = 400;
                 data.battery = 99;
+                data.soil_moisture = 0;
+                data.motion = 0;
             }
 
             esp_ble_mesh_model_t *model = &sensor_models[0];
             uint16_t app_idx = model->keys[0];
 
             if (app_idx != ESP_BLE_MESH_KEY_UNUSED) {
-                
                 if (model->pub && model->pub->publish_addr != ESP_BLE_MESH_ADDR_UNASSIGNED) {
+                    
                     esp_err_t err = esp_ble_mesh_model_publish(
                         model,
                         VND_OP_SENSOR_STATUS,
-                        sizeof(data),
+                        sizeof(sensor_data_t),
                         (uint8_t *)&data,
                         ROLE_NODE
                     );
@@ -318,20 +322,14 @@ static void sensor_task(void *arg) {
                 } 
                 else {
                     uint16_t target_dst = (provisioner_addr != ESP_BLE_MESH_ADDR_UNASSIGNED) ? provisioner_addr : 0x0001;
-
                     esp_ble_mesh_msg_ctx_t ctx = {
                         .net_idx = s_net_idx,
                         .app_idx = app_idx,      
                         .addr = target_dst,
                         .send_ttl = ESP_BLE_MESH_TTL_DEFAULT,
                     };
-
                     esp_err_t err = esp_ble_mesh_server_model_send_msg(
-                        model,
-                        &ctx,
-                        VND_OP_SENSOR_STATUS,
-                        sizeof(data),
-                        (uint8_t *)&data
+                        model, &ctx, VND_OP_SENSOR_STATUS, sizeof(sensor_data_t), (uint8_t *)&data
                     );
                     ESP_LOGI(TAG, "Sent Unicast to 0x%04x, result: %s", target_dst, esp_err_to_name(err));
                 }
