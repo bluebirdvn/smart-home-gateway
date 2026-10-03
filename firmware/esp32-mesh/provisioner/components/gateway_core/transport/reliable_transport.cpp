@@ -107,20 +107,17 @@ void ReliableTransport::rx_loop() {
 
 void ReliableTransport::dispatch_loop() {
     while (is_running.load()) {
-        bool has_frame = false;
+        
+        BaseType_t notified = xTaskNotifyWait(0, ULONG_MAX, nullptr, portMAX_DELAY);
+        if (notified != pdTRUE || !is_running.load()) {
+            break;
+        }
 
-        RawFrame frame;
-        {
-            BaseType_t notified = xTaskNotifyWait(0, ULONG_MAX, nullptr, portMAX_DELAY);
-            if (notified != pdTRUE) {
-                break;
-            }
+        while (true) {
+            bool has_frame = false;
+            RawFrame frame;
 
-            if (!is_running.load()) {
-                break;
-            }
             xSemaphoreTake(dispatch_mutex, portMAX_DELAY);
-
             if (!dispatch_queue.empty()) {
                 frame = dispatch_queue.front();
                 dispatch_queue.pop();
@@ -128,11 +125,22 @@ void ReliableTransport::dispatch_loop() {
             }
             xSemaphoreGive(dispatch_mutex);
 
+            if (!has_frame) {
+                break; 
+            }
+
+            if (on_frame_cb) {
+                on_frame_cb(frame);
+                if (frame.opcode == CMD_GROUP_ADD || 
+                    frame.opcode == CMD_GROUP_DELETE || 
+                    frame.opcode == CMD_MODEL_PUB_SET) {
+                    
+                    vTaskDelay(pdMS_TO_TICKS(2000)); 
+                }
+            }
+    
         }
-        if (on_frame_cb && has_frame) {
-            on_frame_cb(frame);
-            vTaskDelay(pdMS_TO_TICKS(2000));
-        }
+
     }
 }
 
