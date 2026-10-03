@@ -246,7 +246,7 @@ extern "C" void vendor_model_cb(esp_ble_mesh_model_cb_event_t event, esp_ble_mes
         if (param->model_operation.length < sizeof(vnd_actuator_set_t)) {
             return;
         }
-        
+        std::cout << "Received ACTUATOR_SET: elem=" << static_cast<int>(elem_idx) << ", length=" << param->model_operation.length << std::endl;
         vnd_actuator_set_t cmd;
         memcpy(&cmd, param->model_operation.msg, sizeof(cmd));
 
@@ -347,7 +347,10 @@ static void actuator_task_send_status(void *arg)
 
     while (true) {
         if (actuators_mng.receive_status_actuator(status_msg, portMAX_DELAY)) {
-            
+            std::cout << "Received Actuator Status: elem=" << static_cast<int>(status_msg.elem_idx) 
+                      << ", setpoint=" << status_msg.current_setpoint 
+                      << ", status=" << static_cast<int>(status_msg.current_status) 
+                      << std::endl;
             esp_ble_mesh_model_t* target_model = nullptr;
             uint32_t status_opcode = 0;
             uint8_t type = 0;
@@ -375,7 +378,10 @@ static void actuator_task_send_status(void *arg)
                 .send_ttl = ESP_BLE_MESH_TTL_DEFAULT,
             };
             esp_ble_mesh_server_model_send_msg(target_model, &ctx, status_opcode, sizeof(pub_status), (uint8_t*)&pub_status);
-
+            std::cout << "Actuator Status Sent: elem=" << static_cast<int>(status_msg.elem_idx) 
+                      << ", setpoint=" << status_msg.current_setpoint 
+                      << ", status=" << static_cast<int>(status_msg.current_status) 
+                      << std::endl;
                 
         }
     }

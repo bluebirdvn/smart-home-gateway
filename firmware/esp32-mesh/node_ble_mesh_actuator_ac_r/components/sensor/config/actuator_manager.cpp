@@ -41,7 +41,7 @@ void ActuatorManager::handle_auto_set(uint8_t element_index, bool is_auto)
 {
     struct ActuatorData* data = find_actuator_data(element_index);
     data->auto_mode = is_auto;
-
+    std::cout << "Auto Mode Set: elem=" << static_cast<int>(element_index) << ", is_auto=" << is_auto << std::endl;
 }
 
 void ActuatorManager::add_actuator(std::shared_ptr<IActuator> actuator) 
@@ -101,6 +101,7 @@ void ActuatorManager::handle_manual_command(uint8_t elem_idx, const vnd_actuator
         esp_timer_stop(data->hold_timer);
     }
 
+    std::cout << "Manual Command: elem=" << static_cast<int>(elem_idx) << ", setpoint=" << cmd.setpoint << ", status=" << static_cast<int>(cmd.status) << std::endl;
     ActuatorCmd q_cmd = {elem_idx, (float)cmd.setpoint, cmd.status, 0};
     xQueueSend(cmd_queue, &q_cmd, 0);
 }
@@ -111,7 +112,7 @@ void ActuatorManager::handle_threshold_config(uint8_t elem_idx, const vnd_sensor
     if (!data) {
         return;
     }     
-
+    std::cout << "Threshold Config: elem=" << static_cast<int>(elem_idx) << ", src_addr=" << std::hex << config.src_addr << std::dec << std::endl;
     bool found = false;
     for (auto& rule : data->threshold) {
         if (rule.src_addr == config.src_addr) {
@@ -199,6 +200,14 @@ void ActuatorManager::process_sensor_update(uint16_t src_addr, uint16_t dst_addr
                 xQueueSend(cmd_queue, &q_cmd, 0);
             }
         }
+
+        std::cout << "Processed Sensor Update: src_addr=0x" << std::hex << src_addr << std::dec
+                  << ", dst_addr=0x" << std::hex << dst_addr << std::dec
+                  << ", metric=" << metric
+                  << ", actuator_elem=" << static_cast<int>(elem_idx)
+                  << ", actuator_type=" << static_cast<int>(act_type)
+                  << ", auto_mode=" << data.auto_mode
+                  << std::endl;
     }
 }
 
@@ -235,13 +244,20 @@ void ActuatorManager::actuator_task(void *arg)
                 ESP_LOGE(TAG, "Invalid Elem ID: %d", cmd.elem_idx);
             }
 
+            std::cout << "Actuator Task: elem=" << static_cast<int>(cmd.elem_idx) 
+                      << ", setpoint=" << cmd.setpoint 
+                      << ", status=" << static_cast<int>(cmd.status) 
+                      << ", success=" << status_msg.is_success 
+                      << std::endl;
             xQueueSend(dev->status_queue, &status_msg, portMAX_DELAY);
         }
     }
 }
 
 bool ActuatorManager::receive_status_actuator(ActuatorStatusMsg& out_msg, TickType_t wait_ticks) {
-    if (!status_queue) return false;
+    if (!status_queue) {
+        return false;
+    }
     
     if (xQueueReceive(status_queue, &out_msg, wait_ticks) == pdPASS) {
         return true;

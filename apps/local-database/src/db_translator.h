@@ -513,8 +513,8 @@ public:
                             pubDto.group_addr = dto.meshGroupAddr; 
                             pubDto.model_id = optNode->model_id; 
                             pubDto.company_id = optNode->company_id;
-                            pubDto.pub_ttl = 5; 
-                            pubDto.pub_period = 4;    
+                            pubDto.pub_ttl = 7; 
+                            pubDto.pub_period = 0;    
                             pubDto.is_sub = false;
                             pubDto.cmd_or_event = 1;
 
