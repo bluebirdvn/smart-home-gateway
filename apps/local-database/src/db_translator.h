@@ -178,18 +178,19 @@ public:
             try {
                 std::cout << "Syncing all nodes...\n";
                 for (const auto& n : repos->node->findAll()) {
-                    cJSON* obj = cJSON_CreateObject();
-                    cJSON_AddNumberToObject(obj, "addr", n.element_addr);
-                    cJSON_AddStringToObject(obj, "name", sync_json::display_name(n).c_str());
-                    cJSON_AddStringToObject(obj, "uuid", n.uuid.c_str());
-                    cJSON_AddNumberToObject(obj, "unicast", n.unicast);
-                    cJSON_AddNumberToObject(obj, "element_addr", n.element_addr);
-                    cJSON_AddNumberToObject(obj, "model_id", n.model_id);
-                    cJSON_AddNumberToObject(obj, "company_id", n.company_id);
-                    cJSON_AddNumberToObject(obj, "nodeType", (n.kind == "sensor" ? 1 : (n.kind == "unknown" ? 0 : 2)));
-                    cJSON_AddNumberToObject(obj, "devStatus", n.is_online ? 1 : 0);
-                    
-                    ipc->publish("NodeSyncEvent", IpcMessage{JsonUse::to_string(obj)});
+                    NodeInfoDto dto;
+                    dto.addr = n.element_addr;
+                    dto.name = sync_json::display_name(n);
+                    dto.uuid = n.uuid;
+                    dto.unicast = n.unicast;
+                    dto.element_num = n.elem_num;
+                    dto.element_addr = n.element_addr;
+                    dto.model_id = n.model_id;
+                    dto.company_id = n.company_id;
+                    dto.nodeType = (n.kind == "sensor" ? 1 : (n.kind == "unknown" ? 0 : 2));
+                    dto.devStatus = n.is_online ? 1 : 0;
+                    std::cout << "Syncing node: 0x" << std::hex << dto.addr << " name: " << dto.name << std::dec << "\n";
+                    ipc->publish("NodeSyncEvent", IpcMessage{dto.to_json()});
                 }
             } catch (const std::exception& e) {
                 std::cerr << "[DB] SyncAllNodes error: " << e.what() << "\n";
@@ -671,27 +672,13 @@ public:
                     n = *cur;
                 } else {
                     n.element_addr = dto.element_addr;
-
-                    if (dto.model_id == VND_MODEL_ID_SENSOR) { 
-                        n.kind = "sensor";
-                    } else if (dto.model_id == VND_MODEL_ID_ACTUATOR) {
-                        n.kind = "actuator";
-                    } else if (dto.model_id == VND_MODEL_ID_ACTUATOR_AC) {
-                        n.kind = "air conditioner";
-                    } else if (dto.model_id == VND_MODEL_ID_ACTUATOR_LIGHT) {
-                        n.kind = "light";
-                    } else if (dto.model_id == VND_MODEL_ID_ACTUATOR_RELAY) {
-                        n.kind = "relay";
-                    }  else {
-                        n.kind = "unknown";
-                    }
+                    std::cout << "new node : 0x" << std::hex << dto.element_addr << std::dec << "\n";
+                    std::cout << "model_id : 0x" << std::hex << dto.model_id << std::dec << "\n";
                 }
 
                 if (dto.model_id == VND_MODEL_ID_SENSOR) {
                     n.kind = "sensor";
-                    if (n.name.empty() || n.name.find("node_")) {
-                        n.name = "sensor";
-                    }
+                    n.name = "sensor";
                 } else if (dto.model_id == VND_MODEL_ID_ACTUATOR_AC) {
                     n.kind = "air conditioner";
                     n.name = "Air Conditioner"; 
@@ -702,11 +689,13 @@ public:
                     n.kind = "relay";
                     n.name = "relay"; 
                 } else if (dto.model_id == VND_MODEL_ID_ACTUATOR) {
-                    if (n.kind == "unknown") n.kind = "actuator";
-                    if (n.name.empty() || n.name == "unknown" || n.name.find("node_")) {
-                        n.name = "actuator";
-                    }
+                    n.kind = "actuator";
+                    n.name = "actuator"; 
+                } else {
+                    n.kind = "unknown";
+                    n.name = "unknown";
                 }
+                std::cout << "kind : " << n.kind << "\n";
 
                 n.uuid = dto.uuid;
                 n.unicast = dto.unicast; 

@@ -4,6 +4,7 @@
 #include <QDateTime>
 #include <QDebug>
 #include <cstdint>
+#include <QNetworkInterface>
 
 Controller::Controller(IPCEvent* ipcEvent, DeviceModel* model, LogModel* logModel, QObject *parent)
     : QObject(parent), device_models(model), log_model(logModel)
@@ -64,6 +65,40 @@ Controller::Controller(IPCEvent* ipcEvent, DeviceModel* model, LogModel* logMode
     connect(this, &Controller::sigDeleteGroup, ipcEvent, &IPCEvent::reqDeleteGroupDb);
     connect(this, &Controller::sigRequestSyncGroups, ipcEvent, &IPCEvent::reqSyncAllGroups);
     connect(this, &Controller::sigRequestSyncNode, ipcEvent, &IPCEvent::reqSyncAllNodes);
+}
+
+QString Controller::getLocalIp() const
+{
+    const auto interfaces = QNetworkInterface::allInterfaces();
+
+    for (const QNetworkInterface &interface : interfaces) {
+        if (!(interface.flags() & QNetworkInterface::IsUp))
+            continue;
+
+        if (!(interface.flags() & QNetworkInterface::IsRunning))
+            continue;
+
+        if (interface.flags() & QNetworkInterface::IsLoopBack)
+            continue;
+
+        for (const QNetworkAddressEntry &entry : interface.addressEntries()) {
+            const QHostAddress address = entry.ip();
+
+            if (address.protocol() != QAbstractSocket::IPv4Protocol)
+                continue;
+
+            if (address.isLoopback())
+                continue;
+
+            if (address.isInSubnet(QHostAddress("10.0.0.0"), 8) ||
+                address.isInSubnet(QHostAddress("192.168.0.0"), 16) ||
+                address.isInSubnet(QHostAddress("172.16.0.0"), 12)) {
+                return address.toString();
+            }
+        }
+    }
+
+    return "Disconnected";
 }
 
 void Controller::onNodesSynced(const NodeInfoDto &dto) {

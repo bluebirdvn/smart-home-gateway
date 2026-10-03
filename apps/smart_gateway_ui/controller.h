@@ -9,7 +9,7 @@
 #include "devicemodel.h"
 #include "log_model.h"
 
-
+#include <QNetworkInterface>
 
 class IPCEvent;
 
@@ -39,6 +39,7 @@ public:
         return meshState; 
     }
 
+    Q_INVOKABLE QString getLocalIp() const;
     /**
      * @brief all this siganl below was called from qml to send it out to target applicaiton to process cmd
      * 

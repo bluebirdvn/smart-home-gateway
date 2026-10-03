@@ -74,3 +74,8 @@ CREATE TABLE IF NOT EXISTS uuid_whitelist (
 );
 
 PRAGMA user_version = 1;
+
+
+Key of every device = element_addr (one row per element). unicast = primary address of the node.
+IMPORTANT: "CREATE TABLE IF NOT EXISTS" does NOT alter an existing table -> delete the old .db file first.
+

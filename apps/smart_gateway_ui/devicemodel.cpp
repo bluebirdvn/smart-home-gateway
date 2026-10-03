@@ -257,12 +257,13 @@ void DeviceModel::markOffline(const uint16_t &unicast) {
 
 void DeviceModel::updateSensorData(const uint16_t &addr, float temp, float humi, float soil, float lux, float motion, int battery, quint64 lastSeen) {
     for (int i = 0; i < devices.count(); ++i) {
-        if (devices[i].addr == addr && devices[i].kind == NodeKind::Sensor) {
+        if (devices[i].addr == addr && (devices[i].kind == NodeKind::Sensor || devices[i].kind == NodeKind::Unknown)) {
+            devices[i].kind = NodeKind::Sensor;
             devices[i].data.sensor = { humi, temp, lux, soil, motion, battery }; 
             devices[i].lastSeen = lastSeen;
             devices[i].status = 1;
             calculateAverages();
-            emit dataChanged(index(i), index(i), {TemperatureRole, HumidityRole, LuxRole, SoilMoistureRole, MotionRole, BatteryRole, StatusRole});
+            emit dataChanged(index(i), index(i), {TemperatureRole, HumidityRole, LuxRole, SoilMoistureRole, MotionRole, BatteryRole, StatusRole, NodeTypeRole});
             emit deviceCountChanged();
             return;
         }
@@ -271,13 +272,14 @@ void DeviceModel::updateSensorData(const uint16_t &addr, float temp, float humi,
 
 void DeviceModel::updateActuatorStatus(const uint16_t &addr, int actuatorType, float setpoint, int status, quint64 lastSeen) {
     for (int i = 0; i < devices.count(); ++i) {
-        if (devices[i].addr == addr && devices[i].kind == NodeKind::Actuator) {
+        if (devices[i].addr == addr && (devices[i].kind == NodeKind::Actuator || devices[i].kind == NodeKind::Unknown)) {
+            devices[i].kind = NodeKind::Actuator;
             devices[i].data.actuator.actuatorType = actuatorType;
             devices[i].data.actuator.currentSetpoint = setpoint;
             devices[i].data.actuator.setState = status;
             devices[i].lastSeen = lastSeen;
             devices[i].status = 1;
-            emit dataChanged(index(i), index(i), {CurrentSetpointRole, ActuatorStateRole, StatusRole});
+            emit dataChanged(index(i), index(i), {CurrentSetpointRole, ActuatorStateRole, StatusRole, NodeTypeRole});
             setPending(addr, false);
             emit deviceCountChanged();
             return;

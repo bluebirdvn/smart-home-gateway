@@ -56,6 +56,7 @@ void Provisioning::onProvComplete(const MeshFrame& f)
 
     if (ipc) {
         NodeInfoDto dev;
+        dev.addr = p->element_addr;
         dev.net_idx = p->net_idx;
         dev.unicast = f.addr;
         dev.element_num  = p->elem_num;
