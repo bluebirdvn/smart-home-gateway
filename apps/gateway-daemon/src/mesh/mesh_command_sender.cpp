@@ -42,6 +42,7 @@ void MeshCommandSender::group_add(uint16_t addr, uint16_t element_addr, uint16_t
     p.company_id   = company_id;
     p.model_id     = model_id;
     send_struct(OpCode::CMD_GROUP_ADD, addr, p);
+    std::cout << "Sent GroupAdd command to element 0x" << std::hex << element_addr << " for group 0x" << group_addr << std::dec << "\n";
 }
 
 void MeshCommandSender::group_delete(uint16_t addr, uint16_t element_addr, uint16_t group_addr, uint16_t model_id, uint16_t company_id) 
@@ -52,6 +53,7 @@ void MeshCommandSender::group_delete(uint16_t addr, uint16_t element_addr, uint1
     p.company_id   = company_id;
     p.model_id     = model_id;
     send_struct(OpCode::CMD_GROUP_DELETE, addr, p);
+    std::cout << "Sent GroupDelete command to element 0x" << std::hex << element_addr << " for group 0x" << group_addr << std::dec << "\n";
 }
 
 void MeshCommandSender::model_pub_set(uint16_t addr, uint16_t element_addr, uint16_t pub_addr, uint16_t model_id, uint16_t company_id, uint8_t pub_ttl, uint8_t pub_period) 
@@ -64,6 +66,7 @@ void MeshCommandSender::model_pub_set(uint16_t addr, uint16_t element_addr, uint
     p.pub_ttl      = pub_ttl;
     p.pub_period   = pub_period;
     send_struct(OpCode::CMD_MODEL_PUB_SET, addr, p);
+    std::cout << "Sent ModelPubSet command to element 0x" << std::hex << element_addr << " for model 0x" << model_id << std::dec << "\n";   
 }
 
 void MeshCommandSender::sensor_get(uint16_t element_addr, uint16_t sensor_id) 
@@ -80,6 +83,7 @@ void MeshCommandSender::actuator_set(uint16_t element_addr, uint8_t device_type,
     p.onoff = status;
     p.status = status;
     send_struct(OpCode::CMD_ACTUATOR_SET, element_addr, p);
+    std::cout << "Sent ActuatorSet command to element 0x" << std::hex << element_addr << std::dec << "\n";
 }
 
 
@@ -91,6 +95,7 @@ void MeshCommandSender::threshold_config(uint16_t element_addr, uint16_t src_add
     p.type = type;
     p.actuator_type =  actuator_type;
     send_struct(OpCode::CMD_THRESHOLD_CONFIG, element_addr, p);
+    std::cout << "Sent ThresholdConfig command to element 0x" << std::hex << element_addr << std::dec << "\n";
 }
 
 
@@ -102,4 +107,5 @@ void MeshCommandSender::actuator_set_auto(uint16_t addr, uint8_t type, bool is_a
     p.is_auto = is_auto;
 
     send_struct(OpCode::CMD_ACTUATOR_AUTO, addr, p);
+    std::cout << "Sent ActuatorSetAuto command to element 0x" << std::hex << addr << std::dec << "\n";
 }

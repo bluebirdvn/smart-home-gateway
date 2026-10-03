@@ -122,10 +122,10 @@ namespace sync_json {
                 }
             }
 
-            JsonUse::add_int_array(obj, "sensorNodeIds", s_ids);
-            JsonUse::add_int_array(obj, "actuatorNodeIds", a_ids);
-            JsonUse::add_int_array(obj, "syncedSensorIds", sync_s_ids);
-            JsonUse::add_int_array(obj, "syncedActuatorIds", sync_a_ids);
+            JsonUse::add_int_array(obj, "sensorAddrs", s_ids);
+            JsonUse::add_int_array(obj, "actuatorAddrs", a_ids);
+            JsonUse::add_int_array(obj, "syncedSensorAddrs", sync_s_ids);
+            JsonUse::add_int_array(obj, "syncedActuatorAddrs", sync_a_ids);
             
             cJSON_AddItemToArray(arr, obj);
         }
@@ -321,7 +321,7 @@ public:
             try {
                 std::cout << "Received Heartbeat: " << msg.payload << "\n";
                 auto dto = HeartbeatDto::from_json(msg.payload);
-                repos->node->updateStatus(dto.unicast, dto.is_online ? 1 : 0, static_cast<int64_t>(time(nullptr)));
+                repos->node->updateStatusByUnicast(dto.unicast, dto.is_online ? 1 : 0, static_cast<int64_t>(time(nullptr)));
                 
                 if (ipc) {
                     ipc->publish("HeartbeatEvent", msg);
@@ -495,7 +495,7 @@ public:
 
                 repos->group_member->deleteAllInGroup(dto.groupId);
 
-                for (int64_t sensor_elem_addr : dto.sensorNodeIds) {
+                for (int64_t sensor_elem_addr : dto.sensorAddrs) {
                     int e_addr = static_cast<int>(sensor_elem_addr);
                     MeshGroupMember member;
                     member.group_id = dto.groupId; 
@@ -508,13 +508,16 @@ public:
                     } else if (ipc) {
                         if (auto optNode = repos->node->findByElementAddr(e_addr)) {
                             PublishGroupDto pubDto;
-                            pubDto.addr = optNode->element_addr; 
+                            pubDto.addr = optNode->unicast; 
                             pubDto.element_addr = optNode->element_addr;     
                             pubDto.group_addr = dto.meshGroupAddr; 
                             pubDto.model_id = optNode->model_id; 
                             pubDto.company_id = optNode->company_id;
                             pubDto.pub_ttl = 5; 
-                            pubDto.pub_period = 0;                  
+                            pubDto.pub_period = 4;    
+                            pubDto.is_sub = false;
+                            pubDto.cmd_or_event = 1;
+
                             ipc->publish("GroupPublishAddCmd", IpcMessage{pubDto.to_json()});
                         }
                     }
@@ -523,7 +526,7 @@ public:
                 }
 
                 if (ipc) {
-                    for (int64_t actuator_elem_addr : dto.actuatorNodeIds) {
+                    for (int64_t actuator_elem_addr : dto.actuatorAddrs) {
                         int e_addr = static_cast<int>(actuator_elem_addr);
                         
                         if (auto optNode = repos->node->findByElementAddr(e_addr)) {
@@ -551,11 +554,12 @@ public:
                             ipc->publish("MeshCmdThresholdConfig", IpcMessage{threshDto.to_json()});
                             
                             SubscribeGroupDto subDto;
-                            subDto.addr = optNode->element_addr; 
+                            subDto.addr = optNode->unicast; 
                             subDto.element_addr = optNode->element_addr;     
                             subDto.group_addr = dto.meshGroupAddr; 
                             subDto.model_id = optNode->model_id; 
                             subDto.company_id = optNode->company_id;
+                            subDto.is_sub = true;
                             ipc->publish("GroupSubscribeCmd", IpcMessage{subDto.to_json()});
                             
                             MeshGroupMember member;
@@ -582,7 +586,7 @@ public:
                     if (ipc) {
                         if (auto optNode = repos->node->findByElementAddr(e_addr)) {
                             GroupDeleteDto delDto;
-                            delDto.addr = optNode->element_addr;
+                            delDto.addr = optNode->unicast;
                             delDto.element_addr = optNode->element_addr;
                             delDto.group_addr = dto.meshGroupAddr;
                             delDto.model_id = optNode->model_id;

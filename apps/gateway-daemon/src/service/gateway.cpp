@@ -94,65 +94,61 @@ void Gateway::register_ipc_events()
     if (!ipc || !sender || !prov) {
         return;
     }
-
-    const char *module_database = "Db";
-    const char *module_ui = "UI";
-    const char *module_mqtt = "Mqtt";
-    ipc->subscribe(IpcEndpoint{module_mqtt, "", "UuidWhitelistCmd"},
+    ipc->subscribe(IpcEndpoint{"", "com.gateway.mqtt.events", "UuidWhitelistCmd"},
         [this](const IpcMessage& msg) {
             GatewayTranslator::make_set_uuid_match_handler(*sender)(msg);
         }
     );
 
-    ipc->subscribe(IpcEndpoint{module_ui, "", "UuidWhitelistCmd"},
+    ipc->subscribe(IpcEndpoint{"", "com.gateway.ui.events", "UuidWhitelistCmd"},
         [this](const IpcMessage& msg) {
             GatewayTranslator::make_set_uuid_match_handler(*sender)(msg);
         }
     );
 
-    ipc->subscribe(IpcEndpoint{module_database, "", "MeshCmdDeleteNode"},
+    ipc->subscribe(IpcEndpoint{"", "com.gateway.db.events", "MeshCmdDeleteNode"},
         [this](const IpcMessage& msg) {
             GatewayTranslator::make_delete_node_handler(*sender, prov->get_known_uuids_mutex(), prov->known_uuids_get())(msg);
         }
     );
 
-    ipc->subscribe(IpcEndpoint{module_database, "", "MeshCmdActuatorSet"},
+    ipc->subscribe(IpcEndpoint{"", "com.gateway.db.events", "MeshCmdActuatorSet"},
         [this](const IpcMessage& msg) {
             GatewayTranslator::make_actuator_cmd_handler(*sender)(msg);
         }
     );
 
-    ipc->subscribe(IpcEndpoint{module_database, "", "GroupSubscribeCmd"},
+    ipc->subscribe(IpcEndpoint{"", "com.gateway.db.events", "GroupSubscribeCmd"},
         [this](const IpcMessage& msg) {
             GatewayTranslator::make_subscribe_group_handler(*sender, this->node_registry)(msg);
         }
     );
 
-    ipc->subscribe(IpcEndpoint{module_database, "", "GroupUnsubscribeCmd"},
+    ipc->subscribe(IpcEndpoint{"", "com.gateway.db.events", "GroupUnsubscribeCmd"},
         [this](const IpcMessage& msg) {
             GatewayTranslator::make_group_delete_handler(*sender, this->node_registry)(msg);
         }
     );
 
-    ipc->subscribe(IpcEndpoint{module_database, "", "GroupPublishAddCmd"},
+    ipc->subscribe(IpcEndpoint{"", "com.gateway.db.events", "GroupPublishAddCmd"},
         [this](const IpcMessage& msg) {
             GatewayTranslator::make_publish_group_handler(*sender, this->node_registry)(msg);
         }
     );
 
-    ipc->subscribe(IpcEndpoint{module_database, "", "GroupPublishRemoveCmd"},
+    ipc->subscribe(IpcEndpoint{"", "com.gateway.db.events", "GroupPublishRemoveCmd"},
         [this](const IpcMessage& msg) {
             GatewayTranslator::make_group_delete_handler(*sender, this->node_registry)(msg);
         }
     );
 
-    ipc->subscribe(IpcEndpoint{module_database, "", "MeshCmdThresholdConfig"},
+    ipc->subscribe(IpcEndpoint{"", "com.gateway.db.events", "MeshCmdThresholdConfig"},
         [this](const IpcMessage& msg) {
             GatewayTranslator::make_threshold_config_handler(*sender)(msg);
         }
     );
     
-    ipc->subscribe(IpcEndpoint{module_database, "", "MeshCmdAutoMode"},
+    ipc->subscribe(IpcEndpoint{"", "com.gateway.db.events", "MeshCmdAutoMode"},
         [this](const IpcMessage& msg) {
             GatewayTranslator::make_set_auto_actuator_handler(*sender)(msg);
         }

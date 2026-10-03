@@ -52,6 +52,9 @@ int main(int argc, char* argv[])
 
     config.service = std::make_shared<Gateway>(serial_port, config.dbus);
 
+    config.dbus->init();
+    std::cout << "Dbus Ready\n";
+
     if (config.service->start() != COMMUNICATION_SUCCESS) {
         std::cerr << "Gateway service start failed.\n";
         config.service.reset();
@@ -59,8 +62,6 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    config.dbus->init();
-    std::cout << "Ready\n";
 
     while (!config.shutdown.load()) {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));

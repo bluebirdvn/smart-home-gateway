@@ -47,10 +47,12 @@ struct AutomationRuleDto {
     uint16_t meshGroupAddr = 0;
     std::string groupName = "";
     bool isAutoMode = true;
-    std::vector<int64_t> sensorNodeIds;
-    std::vector<int64_t> actuatorNodeIds;
-    std::vector<int64_t> syncedSensorIds;
-    std::vector<int64_t> syncedActuatorIds;
+    
+    std::vector<int64_t> sensorAddrs;
+    std::vector<int64_t> actuatorAddrs;
+    std::vector<int64_t> syncedSensorAddrs;
+    std::vector<int64_t> syncedActuatorAddrs;
+    
     int sensorType = 0;
     double thresholdOn = 0.0;
     double thresholdOff = 0.0;
@@ -64,10 +66,11 @@ struct AutomationRuleDto {
         cJSON_AddNumberToObject(root, "sensorType", sensorType);
         cJSON_AddNumberToObject(root, "thresholdOn", thresholdOn);
         cJSON_AddNumberToObject(root, "thresholdOff", thresholdOff);
-        JsonUse::add_int_array(root, "sensorNodeIds", sensorNodeIds);
-        JsonUse::add_int_array(root, "actuatorNodeIds", actuatorNodeIds);
-        JsonUse::add_int_array(root, "syncedSensorIds", syncedSensorIds);
-        JsonUse::add_int_array(root, "syncedActuatorIds", syncedActuatorIds);
+        
+        JsonUse::add_int_array(root, "sensorAddrs", sensorAddrs);
+        JsonUse::add_int_array(root, "actuatorAddrs", actuatorAddrs);
+        JsonUse::add_int_array(root, "syncedSensorAddrs", syncedSensorAddrs);
+        JsonUse::add_int_array(root, "syncedActuatorAddrs", syncedActuatorAddrs);
         return JsonUse::to_string(root);
     }
 
@@ -82,10 +85,11 @@ struct AutomationRuleDto {
         d.sensorType      = static_cast<int>(JsonUse::get_int(root.ptr, "sensorType"));
         d.thresholdOn     = JsonUse::get_double(root.ptr, "thresholdOn");
         d.thresholdOff    = JsonUse::get_double(root.ptr, "thresholdOff");
-        d.sensorNodeIds       = JsonUse::get_int_array(root.ptr, "sensorNodeIds");
-        d.actuatorNodeIds     = JsonUse::get_int_array(root.ptr, "actuatorNodeIds");
-        d.syncedSensorIds     = JsonUse::get_int_array(root.ptr, "syncedSensorIds");
-        d.syncedActuatorIds   = JsonUse::get_int_array(root.ptr, "syncedActuatorIds");
+        
+        d.sensorAddrs       = JsonUse::get_int_array(root.ptr, "sensorAddrs");
+        d.actuatorAddrs     = JsonUse::get_int_array(root.ptr, "actuatorAddrs");
+        d.syncedSensorAddrs     = JsonUse::get_int_array(root.ptr, "syncedSensorAddrs");
+        d.syncedActuatorAddrs   = JsonUse::get_int_array(root.ptr, "syncedActuatorAddrs");
         return d;
     }
     IPC_FROM_JSON(AutomationRuleDto)

@@ -127,6 +127,7 @@ void DBusGDBus::expose(const std::string& endpoint, RpcCallback callback) {
 void DBusGDBus::worker_thread_loop() {
     IpcTask task;
     while (task_queue.pop(task)) {
+        std::cout << "Processing task: " << task.name << std::endl;
         if (task.type == TaskType::METHOD_CALL) {
             auto it = method_handlers.find(task.name);
             if (it != method_handlers.end()) {
@@ -162,14 +163,16 @@ void DBusGDBus::on_method_call_cb(GDBusConnection*, const gchar*, const gchar*, 
 }
 
 void DBusGDBus::on_signal_cb(GDBusConnection*, const gchar*, const gchar*, const gchar*, const gchar* signal_name, GVariant* parameters, gpointer user_data) {
+
     auto* self = static_cast<DBusGDBus*>(user_data);
     std::string sig_str(signal_name);
-    
+    std::cout << "Received signal: " << sig_str << std::endl;
     if (self->getSignalHandler().find(sig_str) != self->getSignalHandler().end()) {
         IpcTask task;
         task.type = TaskType::SIGNAL_RECEIVED;
         task.name = sig_str;
         task.payload = self->read_payload(parameters);
+        std::cout << "Signal payload: " << task.payload.payload << std::endl;
         self->task_queue.push(task); 
     }
 }
