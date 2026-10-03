@@ -131,7 +131,7 @@ void ReliableTransport::dispatch_loop() {
         }
         if (on_frame_cb && has_frame) {
             on_frame_cb(frame);
-            vTaskDelay(pdMS_TO_TICKS(500));
+            vTaskDelay(pdMS_TO_TICKS(2000));
         }
     }
 }
