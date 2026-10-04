@@ -283,7 +283,7 @@ extern "C" void vendor_model_cb(esp_ble_mesh_model_cb_event_t event, esp_ble_mes
         if (param->model_operation.length < sizeof(vnd_sensor_threshold_t)) {
             return;
         }
-        
+        ESP_LOGI(TAG, "Received Threshold Config: elem=%d", elem_idx);
         vnd_sensor_threshold_t config;
         memcpy(&config, param->model_operation.msg, sizeof(config));
         

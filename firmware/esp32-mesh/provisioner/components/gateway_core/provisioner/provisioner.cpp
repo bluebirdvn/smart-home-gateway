@@ -135,7 +135,7 @@ esp_err_t Provisioner::send_vendor_msg(uint16_t addr, esp_ble_mesh_model_t* mode
     ctx.addr = addr;
     ctx.send_ttl = ESP_BLE_MESH_TTL_DEFAULT;
     return esp_ble_mesh_client_model_send_msg(model, &ctx, opcode, len, const_cast<uint8_t*>(data),
-                                               0, false, ROLE_NODE);
+                                               0, false, ROLE_PROVISIONER);
 }
 
 void Provisioner::ble_mesh_provisioning_cb(esp_ble_mesh_prov_cb_event_t event, esp_ble_mesh_prov_cb_param_t* param)
