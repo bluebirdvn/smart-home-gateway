@@ -3,6 +3,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
+#include "opcode.hpp"
 ReliableTransport::ReliableTransport(std::shared_ptr<ISerialPort> port) : port(port), parser(crc), ack_builder(crc), arq(port, ack_builder) 
 {
     tx_mutex = xSemaphoreCreateMutex();
@@ -131,12 +132,13 @@ void ReliableTransport::dispatch_loop() {
 
             if (on_frame_cb) {
                 on_frame_cb(frame);
-                if (frame.opcode == CMD_GROUP_ADD || 
-                    frame.opcode == CMD_GROUP_DELETE || 
-                    frame.opcode == CMD_MODEL_PUB_SET) {
-                    
-                    vTaskDelay(pdMS_TO_TICKS(2000)); 
+                OpCode current_opcode = static_cast<OpCode>(frame.opcode);
+                if (current_opcode == OpCode::CMD_GROUP_ADD ||
+                    current_opcode == OpCode::CMD_GROUP_DELETE ||
+                    current_opcode == OpCode::CMD_MODEL_PUB_SET) {
+                    vTaskDelay(pdMS_TO_TICKS(2000));
                 }
+
             }
     
         }
