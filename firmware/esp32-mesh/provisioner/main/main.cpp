@@ -144,6 +144,11 @@ static esp_err_t ble_mesh_init(std::shared_ptr<MeshCommandSender> sender,
         return err; 
     }
 
+    sensor_client.model = &vnd_models[0];
+    ac_client.model     = &vnd_models[1];
+    light_client.model  = &vnd_models[2];
+    relay_client.model  = &vnd_models[3];
+    
     Provisioner::getInstance().bind_clients(&config_client, &sensor_client, &ac_client, &light_client, &relay_client, &remote_prov_client);
     Provisioner::getInstance().init(sender, dispatcher);
     Provisioner::getInstance().start_periodic_rpr_scan(30000);

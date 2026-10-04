@@ -130,15 +130,15 @@ esp_err_t Provisioner::send_vendor_msg(uint16_t addr, esp_ble_mesh_model_t* mode
 {
     if (!model) return ESP_ERR_INVALID_STATE;
     esp_ble_mesh_msg_ctx_t ctx = {};
-    ctx.net_idx = DeviceManager::getInstance().get_prov_key().net_idx;
-    ctx.app_idx = DeviceManager::getInstance().get_prov_key().app_idx;
-    ctx.addr = addr;
+    ctx.net_idx  = DeviceManager::getInstance().get_prov_key().net_idx;
+    ctx.app_idx  = DeviceManager::getInstance().get_prov_key().app_idx;
+    ctx.addr     = addr;
     ctx.send_ttl = ESP_BLE_MESH_TTL_DEFAULT;
-    esp_err_t err = esp_ble_mesh_client_model_send_msg(model, &ctx, opcode, len, const_cast<uint8_t*>(data),
-                                               0, false, ROLE_PROVISIONER);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, ">>> BLE MESH API REJECTED MESSAGE: %s <<<", esp_err_to_name(err));
-    }      
+
+    esp_err_t err = esp_ble_mesh_client_model_send_msg(model, &ctx, opcode, len,
+                        const_cast<uint8_t*>(data), 0, false, ROLE_PROVISIONER);
+    ESP_LOGI(TAG, "vendor send addr=0x%04x op=0x%06" PRIx32 " len=%u net=0x%04x app=0x%04x -> %s",
+             addr, opcode, len, ctx.net_idx, ctx.app_idx, esp_err_to_name(err));
     return err;
 }
 
