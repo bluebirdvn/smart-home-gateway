@@ -134,8 +134,12 @@ esp_err_t Provisioner::send_vendor_msg(uint16_t addr, esp_ble_mesh_model_t* mode
     ctx.app_idx = DeviceManager::getInstance().get_prov_key().app_idx;
     ctx.addr = addr;
     ctx.send_ttl = ESP_BLE_MESH_TTL_DEFAULT;
-    return esp_ble_mesh_client_model_send_msg(model, &ctx, opcode, len, const_cast<uint8_t*>(data),
+    esp_err_t err = esp_ble_mesh_client_model_send_msg(model, &ctx, opcode, len, const_cast<uint8_t*>(data),
                                                0, false, ROLE_PROVISIONER);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, ">>> BLE MESH API REJECTED MESSAGE: %s <<<", esp_err_to_name(err));
+    }      
+    return err;
 }
 
 void Provisioner::ble_mesh_provisioning_cb(esp_ble_mesh_prov_cb_event_t event, esp_ble_mesh_prov_cb_param_t* param)
@@ -829,11 +833,15 @@ void Provisioner::handle_cmd_actuator_set(const MeshFrame& f) {
 
     if (target_client != nullptr) {
         uint16_t target_addr = f.addr;
-        send_vendor_msg(target_addr, target_client->model, opcode,
+        esp_err_t err = send_vendor_msg(target_addr, target_client->model, opcode,
                         reinterpret_cast<const uint8_t*>(&cmd), sizeof(cmd));
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to send Actuator Set message to 0x%04x", target_addr);
+        } esle {
+            ESP_LOGI(TAG, "Sent Actuator Set to 0x%04x for device type %d", target_addr, cmd.device_type);
+        }
     }
 
-    ESP_LOGI(TAG, "Sent Actuator Set to 0x%04x for device type %d", f.addr, cmd.device_type);
 }
 
 void Provisioner::handle_cmd_threshold_config(const MeshFrame& f) {
