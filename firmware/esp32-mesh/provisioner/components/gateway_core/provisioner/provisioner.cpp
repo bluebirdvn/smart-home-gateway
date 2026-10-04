@@ -837,7 +837,7 @@ void Provisioner::handle_cmd_actuator_set(const MeshFrame& f) {
                         reinterpret_cast<const uint8_t*>(&cmd), sizeof(cmd));
         if (err != ESP_OK) {
             ESP_LOGE(TAG, "Failed to send Actuator Set message to 0x%04x", target_addr);
-        } esle {
+        } else {
             ESP_LOGI(TAG, "Sent Actuator Set to 0x%04x for device type %d", target_addr, cmd.device_type);
         }
     }
