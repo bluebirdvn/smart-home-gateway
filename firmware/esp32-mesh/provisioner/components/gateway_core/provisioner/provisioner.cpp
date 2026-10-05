@@ -8,6 +8,7 @@
 #include "config.h" 
 #include "mesh_uuid.h"
 #include <iostream>
+#include "esp_ble_mesh_local_data_operation_api.h"
 // static uint8_t test_net_key[16] = {
 //     0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,
 //     0x08,0x09,0x0A,0x0B,0x0C,0x0D,0x0E,0x0F,
@@ -652,17 +653,20 @@ void Provisioner::ble_mesh_vendor_model_cb(esp_ble_mesh_model_cb_event_t event, 
     case ESP_BLE_MESH_CLIENT_MODEL_RECV_PUBLISH_MSG_EVT: {
         uint32_t opcode;
         uint16_t src_addr;
+        uint16_t dst_addr;
         const uint8_t *msg;
         uint16_t msg_len;
 
         if (event == ESP_BLE_MESH_MODEL_OPERATION_EVT) {
             opcode   = param->model_operation.opcode;
             src_addr = param->model_operation.ctx->addr;
+            dst_addr = param->model_operation.ctx->recv_dst;    
             msg      = param->model_operation.msg;
             msg_len  = param->model_operation.length;
         } else {
             opcode   = param->client_recv_publish_msg.opcode;
             src_addr = param->client_recv_publish_msg.ctx->addr;
+            dst_addr = param->client_recv_publish_msg.ctx->recv_dst;
             msg      = param->client_recv_publish_msg.msg;
             msg_len  = param->client_recv_publish_msg.length;
         }
@@ -674,6 +678,15 @@ void Provisioner::ble_mesh_vendor_model_cb(esp_ble_mesh_model_cb_event_t event, 
             }
             mesh_evt_sensor_status_t evt;
             memcpy(&evt, msg, sizeof(evt));
+            
+            if (ESP_BLE_MESH_ADDR_IS_GROUP(dst_addr)) {
+                ESP_LOGI(TAG, "Sensor data from Node 0x%04x published to GROUP 0x%04x: temp %d, lux %d, humi %d", 
+                         src_addr, dst_addr, evt.temperature, evt.lux, evt.humidity);
+            } else {
+                ESP_LOGI(TAG, "Sensor data from Node 0x%04x unicast directly to Gateway: temp %d, lux %d, humi %d", 
+                         src_addr, evt.temperature, evt.lux, evt.humidity);
+            }
+
             ESP_LOGI(TAG, "sensor data: temp %d, lux %d, humi %d", evt.temperature, evt.lux, evt.humidity);
             if (sender) {
                 sender->sensor_status(src_addr, evt);
@@ -787,6 +800,18 @@ void Provisioner::handle_cmd_model_pub_set(const MeshFrame& f) {
     esp_err_t err = esp_ble_mesh_config_client_set_state(&common, &set_state);
     if (err) ESP_LOGE(TAG, "Model Publication Set failed %d", err);
     ESP_LOGI(TAG, "Sent Model Publication Set to 0x%04x for model 0x%04x", f.addr, cmd.model_id);
+
+    if (ESP_BLE_MESH_ADDR_IS_GROUP(cmd.pub_addr)) {
+        uint16_t elem_addr = p_sensor_client->model->element->element_addr;
+        uint16_t cid = p_sensor_client->model->vnd.company_id;
+        uint16_t mod_id = p_sensor_client->model->vnd.model_id;
+        esp_err_t sub_err = esp_ble_mesh_model_subscribe_group_addr(elem_addr, cid, mod_id, cmd.pub_addr);
+        if (sub_err == ESP_OK) {
+            ESP_LOGI(TAG, "Gateway successfully subscribed to group 0x%04x", cmd.pub_addr);
+        } else {
+            ESP_LOGE(TAG, "Gateway failed to subscribe to group 0x%04x, err: %d", cmd.pub_addr, sub_err);
+        }
+    }
 }
 
 void Provisioner::handle_cmd_sensor_get(const MeshFrame& f) {

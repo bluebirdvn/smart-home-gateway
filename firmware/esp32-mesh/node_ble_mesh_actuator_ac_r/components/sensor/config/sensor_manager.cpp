@@ -19,16 +19,17 @@ SensorManager::SensorManager(i2c_master_bus_handle_t i2c_bus, uint8_t sensor_id,
 
 bool SensorManager::init()
 {
+    bool all_ok = true;
     for (ISensor *sensor : sensors)
     {
         if (!sensor->init())
         {
             ESP_LOGE(TAG, "A sensor failed to initialize");
-            return false;
+            all_ok = false;
         }
     }
 
-    return true;
+    return all_ok;
 }
 
 

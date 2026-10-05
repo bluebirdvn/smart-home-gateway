@@ -21,7 +21,7 @@ bool BH1750Sensor::init()
 {
     if (dev.dev_handle == nullptr)
     {
-        if (bh1750_i2c_hal_init(i2c_bus, addr, 400000, &dev.dev_handle) != BH1750_OK)
+        if (bh1750_i2c_hal_init(i2c_bus, addr, 100000, &dev.dev_handle) != BH1750_OK)
         {
             ESP_LOGE(TAG, "Failed to add BH1750 on I2C bus");
             return false;

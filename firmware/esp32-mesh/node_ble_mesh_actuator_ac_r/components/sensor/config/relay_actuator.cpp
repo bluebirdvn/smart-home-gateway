@@ -21,8 +21,8 @@ bool RelayActuator::set_state(float setpoint, uint8_t status, uint64_t time)
 {
     (void)time;
     this->setpoint = static_cast<uint8_t>(setpoint);
-    status = (status > 0) ? 1 : 0;
-    gpio_set_level(static_cast<gpio_num_t>(gpio_num), 1);
+    this->status = (status > 0) ? 1 : 0;
+    gpio_set_level(static_cast<gpio_num_t>(gpio_num), this->status);
     return true;
 
 }

@@ -16,6 +16,12 @@ int16_t bh1750_i2c_hal_init(i2c_master_bus_handle_t bus_handle, uint8_t i2c_addr
     };
 
     esp_err_t err = i2c_master_bus_add_device(bus_handle, &dev_config, out_dev_handle);
+    err = i2c_master_probe(bus_handle, i2c_addr, pdMS_TO_TICKS(1000));
+    if (err != ESP_OK) {
+        i2c_master_bus_rm_device(*out_dev_handle);
+        *out_dev_handle = NULL;
+        return BH1750_ERR;
+    }
     return (err == ESP_OK) ? BH1750_OK : BH1750_ERR;
 }
 

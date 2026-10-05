@@ -450,7 +450,7 @@ public:
     }
 
     void handle_combined_downstream(const MQTTMessage& m) {
-        std::cout << "[MQTT] Received topic=" << m.topic << " payload=" << m.payload << "\n";
+        std::cout << "Received topic=" << m.topic << " payload=" << m.payload << "\n";
     
         if (MqttTopic::topic_matches(MqttTopic::sub_cmd_actuator(), m.topic)) {
             this->handle_actuator_command(m);
@@ -480,7 +480,7 @@ public:
             this->handle_sync_groups_command(m);
         } 
         else {
-            std::cerr << "[MQTT] Unmatched topic: " << m.topic << "\n";
+            std::cerr << "Unmatched topic: " << m.topic << "\n";
         }
     }
 };

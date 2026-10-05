@@ -28,7 +28,7 @@ bool ActuatorManager::init()
         return false;
     }
 
-    BaseType_t ret = xTaskCreate(actuator_task, "actautor_task", 4096, this, 5, &actuator_task_handle);
+    BaseType_t ret = xTaskCreate(actuator_task, "actuator_task", 4096, this, 5, &actuator_task_handle);
     if (ret != pdPASS) {
         ESP_LOGE(TAG, "Failed to create Actuator Task");
         return false;
@@ -40,8 +40,10 @@ bool ActuatorManager::init()
 void ActuatorManager::handle_auto_set(uint8_t element_index, bool is_auto)
 {
     struct ActuatorData* data = find_actuator_data(element_index);
-    data->auto_mode = is_auto;
-    ESP_LOGI(TAG, "Auto Mode Set: elem=%d, is_auto=%d", element_index, is_auto);
+    if (data != nullptr) {
+        data->auto_mode = is_auto;
+        ESP_LOGI(TAG, "Auto Mode Set: elem=%d, is_auto=%d", element_index, is_auto);
+    }
 }
 
 void ActuatorManager::add_actuator(std::shared_ptr<IActuator> actuator) 
@@ -54,7 +56,10 @@ void ActuatorManager::add_actuator(std::shared_ptr<IActuator> actuator)
     esp_timer_create_args_t timer_args = {};
     timer_args.callback = &ActuatorManager::hold_timer_cb;
     
-    struct TimerContext *context = new TimerContext {this, actuator->get_id()};
+    struct TimerContext *context = new TimerContext {
+        this, 
+        actuator->get_id()
+    };
 
     timer_args.arg = context;
     timer_args.name = "pir_hold";
@@ -96,8 +101,10 @@ void ActuatorManager::handle_manual_command(uint8_t elem_idx, const vnd_actuator
     if (!data) {
         return;
     }     
-    data->auto_mode = false; 
-    if (data->actuator->get_type() == PID_SMART_LIGHT || data->actuator->get_type() == PID_SMART_RELAY) {
+    data->auto_mode = false; // Có lệnh tay -> Tạm tắt auto
+    
+    // Dừng timer (bộ đếm giờ tắt) cho MỌI loại thiết bị
+    if (data->hold_timer != nullptr) {
         esp_timer_stop(data->hold_timer);
     }
 
@@ -126,9 +133,11 @@ void ActuatorManager::handle_threshold_config(uint8_t elem_idx, const vnd_sensor
         data->threshold.push_back(config);
     }
 
+    // Bật chế độ auto ngay khi nhận được cấu hình luật mới
     data->auto_mode = true; 
     
-    if (data->actuator->get_type() == PID_SMART_LIGHT || data->actuator->get_type() == PID_SMART_RELAY) {
+    // Dừng timer cho MỌI loại thiết bị để reset vòng đời
+    if (data->hold_timer != nullptr) {
         esp_timer_stop(data->hold_timer);
     }
     
@@ -155,17 +164,20 @@ void ActuatorManager::process_sensor_update(uint16_t src_addr, uint16_t dst_addr
         }
 
         float metric = 0;
-        if (matched_rule->type == 0x00) {
-            metric = sensor_data.temperature / 10.0f;
+        uint8_t base_type = matched_rule->type & 0x03; // Lấy 2 bit cuối định dạng loại cảm biến
+
+        if (base_type == 0x00) {
+            metric = sensor_data.temperature;
         }
-        else if (matched_rule->type == 0x01) {
+        else if (base_type == 0x01) {
             metric = sensor_data.humidity;
         }
-        else if (matched_rule->type == 0x02) {
+        else if (base_type == 0x02) {
             metric = sensor_data.lux;
         }
 
         bool require_motion = (matched_rule->type & 0x04) != 0;
+
         uint8_t act_type = data.actuator->get_type();
         uint8_t elem_idx = data.actuator->get_id(); 
         
@@ -173,35 +185,59 @@ void ActuatorManager::process_sensor_update(uint16_t src_addr, uint16_t dst_addr
         uint8_t on_status = 1;
 
         if (act_type == PID_AC_CONTROLLER) {
-            on_setpoint = 24.0f;
-            on_status = 0x11; 
-        } 
-        else if (act_type == PID_SMART_LIGHT ) {
-            on_setpoint = 100.0f; 
+            on_setpoint = 25.0f; // Bật AC mặc định ở 25 độ
+            on_status = 0x11;    // Power = 1, Mode = Cool
+        } else {
+            on_setpoint = 100.0f;
             on_status = 1;
         }
 
         if (require_motion) {
             if (sensor_data.motion) {
-                if (metric < matched_rule->threshold_on) {
-                    ActuatorCmd q_cmd = {elem_idx, on_setpoint, on_status, 0};
-                    xQueueSend(cmd_queue, &q_cmd, 0);
+                bool turn_on = false;
+                
+                if (base_type == 0x02) {
+                    // Đèn: Bật khi tối (< ngưỡng)
+                    turn_on = (metric < matched_rule->threshold_on);
+                } else {
+                    // AC/Relay theo nhiệt độ: Bật khi nóng (>= ngưỡng)
+                    turn_on = (metric >= matched_rule->threshold_on);
+                }
 
+                if (turn_on) {
+                    ActuatorCmd q_cmd = {elem_idx, on_setpoint, on_status, 0}; 
+                    xQueueSend(cmd_queue, &q_cmd, 0);
+                    
+                    // Kích hoạt/Gia hạn Timer 30s tắt
                     esp_timer_stop(data.hold_timer);
-                    esp_timer_start_once(data.hold_timer, 30000000); 
+                    esp_timer_start_once(data.hold_timer, 30000000);
                 }
             }
         } else {
-            if (metric >= matched_rule->threshold_on) {
+            bool turn_on = false;
+            bool turn_off = false;
+
+            if (base_type == 0x02) {
+                // Logic Đèn
+                turn_on = (metric <= matched_rule->threshold_on);
+                turn_off = (metric >= matched_rule->threshold_off);
+            } else {
+                // Logic AC/Relay
+                turn_on = (metric >= matched_rule->threshold_on);
+                turn_off = (metric <= matched_rule->threshold_off);
+            }
+
+            if (turn_on) {
                 ActuatorCmd q_cmd = {elem_idx, on_setpoint, on_status, 0}; 
                 xQueueSend(cmd_queue, &q_cmd, 0);
-            } else if (metric <= matched_rule->threshold_off) {
+            } else if (turn_off) {
                 ActuatorCmd q_cmd = {elem_idx, 0, 0, 0}; 
                 xQueueSend(cmd_queue, &q_cmd, 0);
             }
         }
 
-        ESP_LOGI(TAG, "Processed Sensor Update: src_addr=0x%04x, dst_addr=0x%04x, metric=%f, actuator_elem=%d, actuator_type=%d, auto_mode=%d", src_addr, dst_addr, metric, elem_idx, act_type, data.auto_mode);
+        ESP_LOGI(TAG, "Processed Sensor Update: src_addr=0x%04x, dst_addr=0x%04x, metric=%f, actuator_elem=%d, actuator_type=%d, auto_mode=%d", 
+                 src_addr, dst_addr, metric, elem_idx, act_type, data.auto_mode);
     }
 }
 

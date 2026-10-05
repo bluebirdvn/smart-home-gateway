@@ -17,8 +17,8 @@ extern "C" {
     #define BOARD_AC_IR_GPIO GPIO_NUM_5  
 
 #elif CONFIG_IDF_TARGET_ESP32H2
-    #define BOARD_I2C_SDA_IO GPIO_NUM_1
-    #define BOARD_I2C_SCL_IO GPIO_NUM_0
+    #define BOARD_I2C_SDA_IO GPIO_NUM_4
+    #define BOARD_I2C_SCL_IO GPIO_NUM_5
     
     #define BOARD_PIR_GPIO   GPIO_NUM_2
     #define BOARD_RELAY_GPIO GPIO_NUM_3

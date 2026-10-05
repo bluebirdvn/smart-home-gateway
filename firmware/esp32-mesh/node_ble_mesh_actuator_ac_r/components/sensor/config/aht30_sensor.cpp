@@ -7,7 +7,7 @@ AHT30Sensor::AHT30Sensor(i2c_master_bus_handle_t i2c_bus, uint8_t addr)
 {
     config.i2c_handle = i2c_bus;
     config.i2c_address = addr;
-    config.i2c_frequency = 400000;
+    config.i2c_frequency = 100000;
 }
 
 AHT30Sensor::~AHT30Sensor()
