@@ -21,3 +21,8 @@ CMakeCache.txt
 .DS_Store
 
 .qtcreator/
+
+build/
+downloads/
+poky/
+sstate-cache/
