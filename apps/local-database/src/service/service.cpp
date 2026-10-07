@@ -74,6 +74,15 @@ void DatabaseService::subscriber_signal()
 
     };
 
+    std::vector<std::pair<std::string, EventCallback>> server_signals = {
+        {"ServerActuatorCmd",      DbTranslator::make_ui_actuator_cmd_handler(repos, ipc.get())},
+        {"ServerAutoModeCmd",      DbTranslator::make_ui_auto_mode_handler(repos, ipc.get())},
+        {"ServerThresholdCmd",     DbTranslator::make_ui_threshold_cmd_handler(repos, ipc.get())},
+        {"ServerDeleteNodeCmd",    DbTranslator::make_ui_delete_node_handler(repos, ipc.get())},
+        {"ServerRequestSensorSync",  DbTranslator::make_ui_request_sync_handler(repos, ipc.get())},
+
+    };
+
     std::vector<std::pair<std::string, EventCallback>> cmd_signals = {
         {"CreateGroupCmd",     DbTranslator::make_ui_create_group_handler(repos, ipc.get())},
         {"UpdateGroupCmd",     DbTranslator::make_ui_update_group_handler(repos, ipc.get())},
@@ -98,6 +107,14 @@ void DatabaseService::subscriber_signal()
         ipc->subscribe(ep, sig.second);
     }
 
+    for (const auto& sig : server_signals) {
+        IpcEndpoint ep;
+        ep.moduleName = "";
+        ep.interface = "com.gateway.mqtt.events";
+        ep.method = sig.first;
+        ipc->subscribe(ep, sig.second);
+    }
+    
     for (const auto& sig : cmd_signals) {
         IpcEndpoint ep;
         ep.moduleName = "";

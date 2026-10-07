@@ -187,10 +187,16 @@ void Controller::deleteGroup(int groupId) {
 }
 
 void Controller::addDeviceToGroup(int groupId, int addr, bool isSensor) {
-    if (!groups_config.contains(groupId)) return;
+    if (!groups_config.contains(groupId)) {
+        return;
+    }
     auto& group = groups_config[groupId];
     const uint16_t a = static_cast<uint16_t>(addr);
-    if (isSensor) group.sensorAddrs.insert(a); else group.actuatorAddrs.insert(a);
+    if (isSensor) {
+        group.sensorAddrs.insert(a);
+    } else {
+        group.actuatorAddrs.insert(a);
+    }
     emit groupsChanged();
 }
 

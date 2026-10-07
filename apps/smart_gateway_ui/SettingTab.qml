@@ -450,7 +450,6 @@ Item {
                                     cbSensorType.currentIndex
                                 )
                             }
-                            // The group row shows "pending" until the mesh confirms every member
                             configGroupPopup.close()
                         }
                     }
@@ -560,7 +559,11 @@ Item {
                 }
                 background: Rectangle {
                     color: parent.down ? "#DCE6EE" : "transparent"
-                    Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: "#E3E7EA" }
+                    Rectangle { 
+                        anchors.bottom: parent.bottom
+                        width: parent.width
+                        height: 1
+                        color: "#E3E7EA" }
                 }
 
                 onClicked: {
