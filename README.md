@@ -499,17 +499,35 @@ Core tools: `std::mutex`, `std::condition_variable`, thread-safe queues. Why sep
 | `mqtt-connect` | `mqtt-connect` | `mqtt-connect.service` | `mqtt.events` | `GroupSyncEvent`, `NodeSyncEvent`, mesh events (see Known Issues) |
  
 ## 6. Message Flows
- 
-Full sequence diagrams with function names: see [`docs/smart_home_ble_mesh_sequence_diagrams.md`](docs/smart_home_ble_mesh_sequence_diagrams.md).
- 
-| Flow | Path |
-|---|---|
-| 1. Local command | UI `UiActuatorCmd` → DB (save) → `MeshCmdActuatorSet` → daemon → UART `0x32` → ESP32 |
-| 2. Actuator feedback | ESP32 `0xB2` → daemon `ActuatorStatus` → DB (update) → `ActuatorSyncEvent` → UI (and MQTT) |
-| 3. Sensor telemetry | ESP32 `0xB1` → daemon `SensorDataStatus` → DB (history) → `SensorSyncEvent` → UI chart. MQTT listens in parallel |
-| 4. Automation config | `UpdateGroupCmd` → DB → threshold, subscribe, publish, auto mode commands → ESP32 → `GroupStatus` → `mesh_applied=1` → `GroupSyncEvent` |
-| 5. Cloud control | MQTT `command` → `UiActuatorCmd` (Virtual UI) → same path as Flow 1 |
- 
+
+The system operates on an event-driven architecture utilizing System D-Bus and MQTT. By persisting data first and decoupling processes, the system ensures zero data loss and flawless synchronization between the hardware edge and the cloud.
+
+### Flow 1: Local Command (UI to Device)
+Describes how a user interaction on the Qt/QML HMI is processed. The command is routed to the local SQLite database for persistence before being re-broadcast to the Gateway Daemon, which encodes it into a robust UART frame (Opcode + CRC16) for the ESP32 Provisioner.
+
+![Local Command Flow](images/flow1.png)
+
+### Flow 2: Actuator Status Feedback
+Details the state synchronization after a hardware execution. Once the ESP32 reports a successful toggle, the Daemon emits a D-Bus signal. The Database captures this, updates its records, and simultaneously triggers both the UI (clearing the "pending" visual state) and the MQTT bridge (updating the cloud dashboard).
+
+![Actuator Status Feedback](images/flow2.png)
+
+### Flow 3: Sensor Telemetry
+Illustrates the asynchronous handling of environmental data. Sensor packets arriving via UART are dispatched over D-Bus, where they are concurrently consumed by the Database (for historical time-series storage), the UI (to update live QtCharts), and the MQTT module (to push to HiveMQ).
+
+![Sensor Telemetry Flow](images/flow3.png)
+
+### Flow 4: Edge Automation Config Orchestration
+Highlights the Database's role as a system orchestrator. A complex Automation Rule created on the UI is broken down by the Database into multiple hardware-level commands (Thresholds, Auto-Mode, Subscriptions). The Database manages a `mesh_applied` synchronization flag, ensuring the UI accurately reflects whether the mesh network has successfully applied the new configuration.
+
+![Edge Automation Config Flow](images/flow4.png)
+
+### Flow 5: Cloud Remote Control (Virtual UI)
+Demonstrates the "Unified Pipeline" pattern. The MQTT bridge acts as a Virtual UI, translating incoming cloud payloads into the exact same local D-Bus signals emitted by the physical HMI. This completely abstracts the network layer, achieving 100% logic reuse for downstream processing.
+
+![Cloud Remote Control Flow](images/flow5.png)
+
+
 ## 7. Build and Flash Guide
  
 ### 7.1 Prerequisites
@@ -602,7 +620,7 @@ These are the edge devices scattered around the house.
 5.  **Configure:** Assign the node to a Group to begin Edge Automation.
 
 
-## . Further Reading
+## 9. Further Reading
  
 | Topic | Link |
 |---|---|
