@@ -50,7 +50,7 @@ This document has two goals:
 
 ## 2. System Architecture
  
-![System Architecture](images/images/Untitled Diagram-Page-2.drawio.png)
+![System Architecture](images/system_architecture.png)
 
 ### System Architecture Overview
 
