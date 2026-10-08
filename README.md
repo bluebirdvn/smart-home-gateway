@@ -39,16 +39,12 @@ This document has two goals:
    - [7.7 First Boot Checklist](#77-first-boot-checklist)
    - [7.8 Fast Application Update (For Developers)](#78-fast-application-update-for-developers)
 8. [Firmware Guide (ESP32)](#8-firmware-guide-esp32)
-<<<<<<< HEAD
-9. [Further Reading](#9-further-reading)
-10. [License](#10-license)
-=======
 9. [Further Reading](#9-further-reading)     
 10. [License](#10-license)
 
 ---
 
-## ⚡ Live Hardware & Touch Interaction Demo
+## Hardware & Touch Interaction Demo
 
 The Qt/QML interface runs directly on the Raspberry Pi Zero 2 W's framebuffer (`/dev/fb1`) using the `evdev` touch driver, completely bypassing X11/Wayland. 
 
@@ -68,7 +64,6 @@ This fluid performance is achieved by optimizing the SPI clock to 50MHz, locking
 | <img src="images/SettingTab.jpeg" width="400" alt="Touch UI SETTING TAB"> | <img src="images/LogTab.jpeg" width="400" alt="Touch UI LOG TAB"> |
 
 ---
->>>>>>> 81605b4 (update README.md)
 
 ---
  
@@ -863,11 +858,17 @@ This is the "Network Co-Processor" (NCP) attached directly to the Raspberry Pi.
     4. Upon success, it fires `PROV_COMPLETE_COMP_EVT` and sends `NodeInfo` back to the Gateway.
 
 #### B. The Actuator/Sensor Nodes (`firmware/esp32-mesh/node_ble_mesh_actuator_ac_r/`)
-These are the edge devices scattered around the house.
-*   **Sensors (Temp, Humidity, Lux, PIR):** They run a hardware timer (e.g., every 30 seconds) or hardware interrupts (PIR). They read data via I2C/ADC, format it, and **Publish** the data to a designated **Group Address** (configured by the Gateway).
-*   **Actuators (Relay, AC, Lights):** They **Subscribe** to the Gateway's commands and, more importantly, to the Sensor's Group Address.
-*   **Zero-Latency Edge Automation:** When an Actuator receives a `CMD_ACTUATOR_AUTO` command, its `is_auto` flag is set to `true`. From then on, if a Sensor publishes a threshold-exceeding value to the Group Address, the Actuator toggles its GPIO **locally and instantly**, completely bypassing the Raspberry Pi and Wi-Fi network.
+These edge devices interface directly with physical environments and appliances utilizing native ESP-IDF hardware APIs.
 
+*   **Environmental Sensors (AHT30 & BH1750):** 
+    Interfaced via the **I2C bus**. A FreeRTOS software timer triggers a task every 30 seconds to sample temperature, humidity, and ambient light (Lux), packaging the telemetry before publishing it to the designated Group Address.
+*   **PIR Motion Sensor:** 
+    Instead of inefficient polling, the PIR sensor is wired to a GPIO configured with an **Hardware External Interrupt (ISR)**. This ensures immediate, zero-latency detection of human presence to trigger lighting or security rules.
+*   **Air Conditioner Control (IR Transmitter):** 
+    Unlike simple relays, the AC is controlled via infrared signals. The firmware utilizes the **ESP32 RMT (Remote Control) peripheral** to accurately generate the complex 38kHz modulated IR carrier waves required to spoof AC remote protocols.
+*   **Zero-Latency Edge Automation:** 
+    When an Actuator receives a `CMD_ACTUATOR_AUTO` command, its `is_auto` flag is set to `true`. From then on, if a Sensor publishes a threshold-exceeding value to the Group Address, the Actuator evaluates it and toggles its GPIO (or fires an IR signal) **locally and instantly**, completely bypassing the Raspberry Pi and Wi-Fi network.
+   
 #### C. Remote Provisioning Server (`firmware/esp32-mesh/rpr_server/`)
 *   Supports the PB-Remote bearer. It allows the main Provisioner to securely add devices that are physically located out of its direct Bluetooth radio range by routing the provisioning packets through intermediate nodes.
 
