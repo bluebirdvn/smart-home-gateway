@@ -39,8 +39,36 @@ This document has two goals:
    - [7.7 First Boot Checklist](#77-first-boot-checklist)
    - [7.8 Fast Application Update (For Developers)](#78-fast-application-update-for-developers)
 8. [Firmware Guide (ESP32)](#8-firmware-guide-esp32)
+<<<<<<< HEAD
 9. [Further Reading](#9-further-reading)
 10. [License](#10-license)
+=======
+9. [Further Reading](#9-further-reading)     
+10. [License](#10-license)
+
+---
+
+## ⚡ Live Hardware & Touch Interaction Demo
+
+The Qt/QML interface runs directly on the Raspberry Pi Zero 2 W's framebuffer (`/dev/fb1`) using the `evdev` touch driver, completely bypassing X11/Wayland. 
+
+**[Click here to watch the Hardware Touch Demo on YouTube](https://youtube.com/shorts/kxLzzBiRDqU)**
+
+This fluid performance is achieved by optimizing the SPI clock to 50MHz, locking the BCM2710A1 core frequency, and routing all control signals through a lightweight, non-blocking System D-Bus IPC pipeline.
+
+*(Note: The command is routed from the UI -> System D-Bus -> SQLite Orchestrator -> Gateway Daemon -> Reliable UART -> ESP32 Provisioner -> BLE Mesh Node).*
+
+### UI Screenshots Showcase
+*(Click the Home Tab image below to watch the video demo)*
+
+| Home Tab (System Dashboard) | Device Management Tab |
+| :---: | :---: |
+| <a href="https://youtube.com/shorts/kxLzzBiRDqU" target="_blank"><img src="images/Homepage.jpeg" width="400" alt="Touch UI HOME TAB"></a> | <img src="images/DeviceTab.jpeg" width="400" alt="Touch UI DEVICE TAB"> |
+| **Settings & Configuration** | **System Log & Debug** |
+| <img src="images/SettingTab.jpeg" width="400" alt="Touch UI SETTING TAB"> | <img src="images/LogTab.jpeg" width="400" alt="Touch UI LOG TAB"> |
+
+---
+>>>>>>> 81605b4 (update README.md)
 
 ---
  
