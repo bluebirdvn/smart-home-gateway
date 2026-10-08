@@ -29,10 +29,18 @@ This document has two goals:
    - [4.13 Concurrency patterns used in the daemon](#413-concurrency-patterns-used-in-the-daemon)
 5. [Module Reference](#5-module-reference)
 6. [Message Flows](#6-message-flows)
-7. [Build and Flash Guide](#7-build-and-flash-guide)
+7. [Configuration, Build, and Flash Guide](#7-configuration-build-and-flash-guide)
+   - [7.1 Clone the Repository](#71-clone-the-repository)
+   - [7.2 Configuration Steps](#72-configuration-steps)
+   - [7.3 Build the Yocto Image](#73-build-the-yocto-image)
+   - [7.4 Flash the SD Card](#74-flash-the-sd-card)
+   - [7.5 Display & Touch Screen Setup (ILI9341)](#75-display--touch-screen-setup-ili9341)
+   - [7.6 Optimizing UI Refresh Rate (SPI & Core Clock)](#76-optimizing-ui-refresh-rate-spi-and-core-clock)
+   - [7.7 First Boot Checklist](#77-first-boot-checklist)
+   - [7.8 Fast Application Update (For Developers)](#78-fast-application-update-for-developers)
 8. [Firmware Guide (ESP32)](#8-firmware-guide-esp32)
-9. [Further Reading](#13-further-reading)
-
+9. [Further Reading](#9-further-reading)
+10. [License](#10-license)
 
 ---
  
@@ -54,11 +62,11 @@ This document has two goals:
 
 ### System Architecture Overview
 
-The system is built upon a **Host-NCP (Network Co-Processor)** model, combining a multi-process Linux Host (Raspberry Pi Zero 2 W) with a Real-Time Edge Network (ESP32). This strict separation of concerns ensures high stability, scalability, and zero-latency edge automation.
+The system is built upon a **Host-NCP (Network Co-Processor)** model, combining a multi-process Linux Host (Raspberry Pi Zero 2 W) with a Real-Time Edge Network (ESP32).
 
 **1. Application Host Layer (Yocto Linux on Raspberry Pi)**
 The software stack is decoupled into four independent microservices communicating exclusively via **System D-Bus (Pub/Sub)**. If one process (e.g., UI) crashes, the core daemon and database continue to operate autonomously.
-*   **`local-database`**: The SQLite-based orchestrator and **Single Source of Truth**. It persists all local and remote configurations before re-broadcasting instructions, ensuring zero data loss upon unexpected reboots.
+*   **`local-database`**: The SQLite-based orchestrator and **Single Source of Truth**. It persists all local and remote configurations before re-broadcasting instructions.
 *   **`gateway-daemon`**: The C++ core application. It translates D-Bus DTOs into a custom binary protocol (Opcode + CRC16 + ARQ) and manages a reliable UART link to the physical layer.
 *   **`smart_gateway_ui`**: The Qt/QML frontend rendering the HMI on an ILI9341 SPI display, operating strictly on an event-driven basis (`*SyncEvent`).
 *   **`mqtt-connect`**: A TLS-secured bridge to HiveMQ Cloud. Using a "Virtual UI" pipeline, it translates downstream cloud commands into internal D-Bus signals, achieving 100% logic reuse.
@@ -80,7 +88,7 @@ Real-time radio operations are offloaded to dedicated microcontrollers to preven
  
 ```text
 smart-home-gateway/
-├── apps/                  # C++/Qt applications                       TODO: list sub-folders
+├── apps/                  # Contains: gateway-daemon, local-database, mqtt-connect, smart_gateway_ui
 ├── firmware/
 │   ├── esp32-mesh/
 │   │   ├── provisioner/                   # BLE Mesh Provisioner + UART bridge
@@ -136,7 +144,7 @@ Bluetooth Mesh is a many-to-many, multi-hop networking topology built on Bluetoo
 
 **Why the project uses it (vs. Zigbee / LoRa):**
 *   **Direct Smartphone Access:** Unlike Zigbee, BLE is native to smartphones/PCs. Devices can be controlled directly via the GATT Proxy feature without mandating a network gateway.
-*   **Higher Bandwidth:** BLE 4.2 offers data rates up to 1 Mbps, significantly faster than Zigbee's 250 Kbps limit (based on 802.15.4).
+*   **Higher Bandwidth:** BLE 5.x offers data rates up to 1 Mbps, significantly faster than Zigbee's 250 Kbps limit (based on 802.15.4).
 *   **Cost & Ecosystem:** The massive smartphone-driven scale of BLE makes its chipsets generally more cost-effective than Zigbee ICs.
 *   **Practicality for Smart Homes:** While LoRa is excellent for WAN/long-range, operating in unlicensed ISM bands requires strict compliance with transmission power and duty cycle regulations, making it less ideal for high-density, real-time home automation. BLE Mesh is purpose-built for building automation and smart lighting.
 
@@ -179,8 +187,6 @@ idf.py -p /dev/ttyUSB0 erase-flash       # wipe NVS (forget all provisioning dat
 - Changing the target chip wipes `sdkconfig`. Keep your options in `sdkconfig.defaults`.
 - If a node was provisioned and you change its role, run `erase-flash` so old keys are removed.
 - Pick **Bluedroid** or **NimBLE** host in menuconfig. The `sdkconfig.ci.*` files show tested combinations.
-`TODO:` ESP-IDF version, UART number and pins used by the Provisioner for the gateway link.
-
 
  
 ### 4.3 UART framing, CRC16 and ARQ
@@ -198,9 +204,9 @@ START | opcode | addr (LE, 2B) | seq | type | len | payload (len bytes) | CRC16 
 | `opcode` | What the frame means (command or event). See table below |
 | `addr` | Target or source `element_addr` (little-endian) |
 | `seq` | Sequence number used for ACK matching |
-| `type` | Frame type (data, reliable data, ACK, ...). `TODO: exact values` |
+| `type` | Frame type (data, reliable data, ACK, ...) |
 | `len` | Payload length |
-| `CRC16` | Integrity check over the frame. `TODO: polynomial/init (CCITT-FALSE, MODBUS, ...)` |
+| `CRC16` | Integrity check over the frame. |
  
 **Opcodes**
  
@@ -264,7 +270,7 @@ On a Raspberry Pi Zero 2W, make sure the serial console on that UART is disabled
 
 **System bus policy.**
 On Linux, unprivileged processes cannot own well-known names or broadcast signals on the system bus without an explicit configuration policy. 
-- **Policy Path:** `/etc/dbus-1/system.d/com.gateway.conf` (deployed via the Yocto recipe `recipes-apps-config/apps-config`).
+- **Policy Path:** `/etc/dbus-1/system.d/com.gateway.conf` (deployed via the Yocto recipe `recipes-apps-config/`).
 - **Permissions:** Grants default user permissions to own names (`com.gateway.*`), send method calls, and receive broadcast signals across all four gateway interfaces.
 
 **Useful Diagnostic Commands**
@@ -280,10 +286,10 @@ dbus-monitor --system "type='signal',interface='com.gateway.db.events'" \
 busctl --system list | grep com.gateway
 
 # Introspect an active module object interface
-busctl --system introspect com.gateway.mesh /com/gateway/mesh com.gateway.mesh.events
+busctl --system introspect com.gateway.mesh /com/gateway/m  esh com.gateway.mesh.events
 
 # Manually trigger a database synchronization request from terminal
-busctl --system emit /com/gateway/ui com.gateway.ui.events SyncAllNodesCmd "s" "{}"
+busctl --system emit /com/gateway/ui com.gateway.ui.events SyncAllNodesCmd "v" "{}"
 ```
 
 ### 4.5 Event-driven design and the DB as orchestrator
@@ -310,7 +316,7 @@ This is **eventual consistency**: the DB and the mesh are briefly different and 
  
 **Why here.** Small footprint, ACID transactions, good enough for a gateway. The DB module is the only writer, so there are no cross-process locking problems.
  
-**Data model (names inferred from the code, verify with `.schema`)**
+**Data model**
  
 | Table | Content |
 |---|---|
@@ -359,14 +365,14 @@ Command payload:
 - **Models.** Lists shown in QML come from `QAbstractListModel` or similar C++ models.
 - **QtCharts.** `Chart.qml` appends points to line series to draw sensor curves.
 - **Thread rule.** UI objects live in the main thread. D-Bus callbacks must hop into it (queued signals).
-**On the target (no desktop).** The UI usually runs full screen without X11/Wayland, using the **eglfs** platform plugin:
+**On the target (no desktop).** The UI runs full screen without X11/Wayland. Since the ILI9341 operates over SPI and is mapped as a secondary framebuffer (`/dev/fb1`), the UI strictly uses the `linuxfb` platform plugin with software rendering to ensure maximum stability on the Pi Zero 2 W:
  
 ```bash
-QT_QPA_PLATFORM=eglfs   # TODO: confirm in ui-qt.service
+Environment=QT_QPA_PLATFORM=linuxfb:fb=/dev/fb1
+Environment=QT_QUICK_BACKEND=software
+Environment=QT_QPA_GENERIC_PLUGINS=evdevtouch:/dev/input/event0
 ```
  
-Touch input needs the right input device (see `QT_QPA_EVDEV_TOUCHSCREEN_PARAMETERS`) and the display overlay from section 4.11.
-
 ### 4.9 systemd
  
 **What it is.** The init system. It starts services at boot in dependency order and restarts them if they crash.
@@ -385,11 +391,11 @@ Typical unit anatomy:
 ```ini
 [Unit]
 Description=Gateway daemon
-After=dbus.service local-database.service     # start order
+After=dbus.service local-database.service     
 Requires=dbus.service
  
 [Service]
-ExecStart=/usr/bin/gateway-daemon             # TODO: real path
+ExecStart=/usr/bin/gateway-daemon            
 Restart=on-failure
  
 [Install]
@@ -401,8 +407,8 @@ WantedBy=multi-user.target
 ```bash
 systemctl status daemon-uart.service
 systemctl restart local-database.service
-journalctl -u daemon-uart.service -f          # follow logs
-journalctl -b -p err                          # errors since boot
+journalctl -u daemon-uart.service -f          
+journalctl -b -p err                        
 systemctl list-dependencies multi-user.target
 ```
  
@@ -448,7 +454,7 @@ The `%` in `openssl_%.bbappend` matches any version of the recipe.
 source poky/oe-init-build-env build              # enter the build environment
 bitbake-layers show-layers                       # confirm meta-ble-mesh is listed
 bitbake-layers add-layer ../yocto/meta-ble-mesh  # add the layer if missing
-bitbake <your-image-name>                        # TODO: image name
+bitbake <your-image-name>                        
 bitbake -c cleansstate gateway-app               # force rebuild of one recipe
 bitbake -e gateway-app | grep ^SRC_URI           # inspect recipe variables
 ```
@@ -466,7 +472,7 @@ Output is under `build/tmp/deploy/images/<machine>/`.
 In this project `screen_overlayer.dts` describes the touch display. The `screen-overlayer` recipe compiles it with `dtc` into a `.dtbo`, which the Raspberry Pi firmware loads through `config.txt`:
  
 ```text
-dtoverlay=screen_overlayer       # TODO: confirm name
+dtoverlay=screen_overlayer       
 ```
 
 
@@ -500,7 +506,7 @@ Core tools: `std::mutex`, `std::condition_variable`, thread-safe queues. Why sep
  
 ## 6. Message Flows
 
-The system operates on an event-driven architecture utilizing System D-Bus and MQTT. By persisting data first and decoupling processes, the system ensures zero data loss and flawless synchronization between the hardware edge and the cloud.
+The system operates on an event-driven architecture utilizing System D-Bus and MQTT.
 
 ### Flow 1: Local Command (UI to Device)
 Describes how a user interaction on the Qt/QML HMI is processed. The command is routed to the local SQLite database for persistence before being re-broadcast to the Gateway Daemon, which encodes it into a robust UART frame (Opcode + CRC16) for the ESP32 Provisioner.
@@ -523,51 +529,277 @@ Highlights the Database's role as a system orchestrator. A complex Automation Ru
 ![Edge Automation Config Flow](images/flow4.png)
 
 ### Flow 5: Cloud Remote Control (Virtual UI)
-Demonstrates the "Unified Pipeline" pattern. The MQTT bridge acts as a Virtual UI, translating incoming cloud payloads into the exact same local D-Bus signals emitted by the physical HMI. This completely abstracts the network layer, achieving 100% logic reuse for downstream processing.
+Demonstrates the "Unified Pipeline" pattern. The MQTT bridge acts as a Virtual UI, translating incoming cloud payloads into the exact same local D-Bus signals emitted by the physical HMI. 
 
 ![Cloud Remote Control Flow](images/flow5.png)
 
 
-## 7. Build and Flash Guide
- 
-### 7.1 Prerequisites
- 
-- Linux host (Ubuntu recommended), Docker, about 100 GB free disk
-- ESP-IDF installed (for firmware only)
-### 7.2 Build the Yocto image
- 
+## 7. Configuration, Build, and Flash Guide
+
+Before building the Yocto image, configure the Wi-Fi credentials and the MQTT broker settings. They are baked into the root filesystem.
+
+> **Security note:** these files contain secrets. Do not commit real credentials to Git. Keep a template in the repository and your real values only on your machine.
+
+### 7.1 Clone the Repository
+
 ```bash
+git clone https://github.com/bluebirdvn/smart-home-gateway.git
 cd smart-home-gateway
-./run_docker.sh          # enter the build container
-./build.sh               # TODO: what it does (init env, bitbake <image>)
 ```
- 
-Manual equivalent inside the container:
- 
+
+### 7.2 Configuration Steps
+
+#### A. Wi-Fi Setup
+
+The Raspberry Pi needs internet access to reach HiveMQ Cloud.
+
+- **File:** `yocto/meta-ble-mesh/recipes-connectivity/wifi-config/files/wifi.conf`
+- **Action:** edit the file with your local Wi-Fi credentials.
+
 ```bash
+WIFI_SSID="Your_WiFi_Name"
+WIFI_PASSWORD="Your_WiFi_Password"
+```
+
+#### B. MQTT Broker Credentials (HiveMQ Cloud)
+
+The `mqtt-connect` daemon reads its connection settings from a JSON file.
+
+- **File:** `yocto/meta-ble-mesh/recipes-apps-config/files/mqtt_config.json`
+- **Action:** replace the placeholders with your HiveMQ Cloud cluster details. Keep `use_tls` set to `true` and the port set to `8883`.
+
+
+```json
+{
+  "host": "your-cluster-id.hivemq.cloud",
+  "port": 8883,
+  "client_id": "rpi_gateway_01",
+  "username": "your_hivemq_user",
+  "password": "your_hivemq_password",
+  "use_tls": true,
+  "verify_server": true
+}
+```
+
+#### C. System D-Bus Configuration (Optional)
+
+The D-Bus object paths and interfaces are defined in `config.json`.
+
+- **File:** `yocto/meta-ble-mesh/recipes-apps-config/files/config.json`
+- **Action:** you normally do not need to change it, unless you add new services to the architecture.
+
+### 7.3 Build the Yocto Image
+
+The project provides a reproducible build environment based on Docker, which avoids host OS incompatibilities.
+
+**Prerequisites**
+
+- Linux host (Ubuntu 20.04 or 22.04 recommended)
+- Docker installed
+- About 100 GB of free disk space
+
+```bash
+# 1. Start and enter the Yocto build container
+./run_docker.sh
+
+# 2. Initialize the OpenEmbedded build environment
 source poky/oe-init-build-env build
-bitbake-layers show-layers
-bitbake <your-image-name>
+
+# 3. Verify that the custom meta-layer is included
+bitbake-layers show-layers | grep meta-ble-mesh
+
+# 4. Build the final image (replace gateway-image with your real image recipe name)
+bitbake gateway-image
 ```
- 
-### 7.3 Flash the SD card
- 
+
+> **Note:** the first build downloads all sources and compiles the toolchain from scratch, which can take several hours depending on your CPU. Later builds are much faster thanks to `sstate-cache`.
+
+### 7.4 Flash the SD Card
+
+When the build finishes, the output image (`.wic` or `.wic.bz2`) is in `build/tmp/deploy/images/raspberrypi0-2w-64/`.
+
 ```bash
-./autoflash.sh           # TODO: describe
+# Flash the image to your SD card (/dev/sdX).
+# WARNING: double-check the device path, or you may wipe your host drive.
+sudo bmaptool copy \
+  build/tmp/deploy/images/raspberrypi0-2w-64/gateway-image.wic.bz2 /dev/sdX
+
+# Alternatively, use the provided script:
+./autoflash.sh /dev/sdX
 ```
-### 7.4 First boot checklist
- 
-1. Edit `wifi.conf` (SSID, password) before building, or set it on the target.
-2. Boot, then check services: `systemctl --failed`.
-3. Check D-Bus traffic with `dbus-monitor` (section 9).
-4. Check the UART device exists and the ESP32 is connected.
-5. Check MQTT connection in `journalctl -u mqtt-connect -f`.
-### 7.5 Updating one application quickly
- 
+
+Use `lsblk` to find the correct device name before flashing.
+
+### 7.5 Display & Touch Screen Setup (ILI9341)
+
+The UI runs on an SPI-based ILI9341 TFT display with a touch controller (typically XPT2046/ADS7846). It communicates directly with the Raspberry Pi via the SPI bus, requiring no HDMI connection.
+
+**1. Hardware Wiring (SPI)**
+*(Note: Always verify the exact GPIO pins defined in your custom device tree overlay `yocto/meta-ble-mesh/recipes-kernel/rapi-dts-overlays/files/screen_overlayer.dts`.)*
+
+| ILI9341 Pin | Raspberry Pi Zero 2 W | Notes |
+|---|---|---|
+| **VCC / VDD** | 3.3V or 5V (Pin 1 or 2) | Check your specific screen module's voltage |
+| **GND** | GND (Pin 6) | Common Ground |
+| **MOSI** | GPIO 10 (Pin 19) | SPI0 MOSI (Data to screen) |
+| **MISO** | GPIO 9 (Pin 21) | SPI0 MISO (Data from touch) |
+| **SCLK** | GPIO 11 (Pin 23) | SPI0 Clock |
+| **CS** | GPIO 8 (Pin 24) | SPI0 CE0 (Chip Select for LCD) |
+| **DC / RS** | GPIO 24 (Pin 18) | Data/Command control pin |
+| **RESET** | GPIO 25 (Pin 22) | LCD Reset |
+| **LED** | 3.3V (Pin 17) | Backlight power |
+| **T_CS (Touch)** | GPIO 7 (Pin 26) | SPI0 CE1 (Chip Select for Touch) |
+| **T_IRQ (Touch)**| GPIO 17 (Pin 11) | Hardware interrupt for touch events |
+
+**2. Software Configuration (How it works under the hood)**
+*   **Device Tree:** The custom Yocto recipe `screen-overlayer` compiles `screen_overlayer.dts` into a `.dtbo` binary. During boot, the Pi's firmware reads `dtoverlay=screen_overlayer` from `config.txt` and loads the Linux framebuffer driver (typically `fb_ili9341`) and the touch driver (`ads7846`).
+*   **Qt/QML:** To maximize performance and minimize RAM usage on the Pi Zero 2 W, the UI application (`ui-qt.service`) bypasses heavy desktop environments like X11 or Wayland. It renders directly to the framebuffer using `QT_QPA_PLATFORM=linuxfb`. Touch interactions are automatically routed via the Linux `evdev` input subsystem.
+
+### 7.6 Optimizing UI Refresh Rate (SPI and Core Clock)
+
+Driving a Qt UI over SPI can feel sluggish or show tearing when the bus bandwidth is too low. The ILI9341 panel is 320x240 with 16-bit color (RGB565), so one full frame is:
+
+```text
+320 x 240 x 16 bit = 1,228,800 bit  (about 1.23 Mbit)
+```
+
+To refresh the whole screen 30 times per second the bus must carry about 37 Mbit/s of pixel data, and real transfers add overhead (chip select, DC line, command bytes, kernel scheduling). The table below shows the best case: the highest frame rate each SPI clock allows if nothing else uses the bus.
+
+| SPI clock | Theoretical max full-screen FPS |
+|---|---|
+| 16 MHz | 13 |
+| 32 MHz | 26 |
+| 40 MHz | 32 |
+| 48 MHz | 39 |
+| 50 MHz | 40 |
+
+So a 32 MHz clock cannot reach 30 FPS with full-screen updates, and 40 to 50 MHz is a realistic target. Updating only the changed screen area (dirty rectangles) lowers the load much more than any clock change.
+
+#### 1. Increase the SPI maximum frequency (device tree)
+
+Many display drivers default to 16 MHz or 32 MHz. In the custom overlay (`screen_overlayer.dts`), raise `spi-max-frequency`:
+
+```dts
+/* Snippet inside screen_overlayer.dts */
+ili9341: display@0 {
+    compatible = "ilitek,ili9341";
+    reg = <0>;
+    spi-max-frequency = <50000000>;   /* see the divider note below */
+    rotate = <90>;
+    bgr = <1>;
+    fps = <60>;                       /* upper limit for the refresh rate */
+};
+```
+
+> **Notes**
+>
+> - The ILI9341 datasheet specifies a much lower write clock than 50 MHz. Many boards work at 40 to 60 MHz in practice, but this is outside the specification. It depends on short wires, a good ground, and your panel. If you see wrong colors or noise, lower the clock.
+> - Properties such as `rotate`, `bgr` and `fps` belong to the `fbtft` driver. A DRM driver for the ILI9341 uses different properties (for example `rotation`). Use the set that matches the driver in your kernel.
+> - Keep `fps` at or above your target. A value of `30` makes the driver limit the display to 30 FPS.
+
+#### 2. The Raspberry Pi core clock
+
+The SPI0 clock is derived from the core clock (`core_freq`). The Raspberry Pi SPI driver divides the core clock by an **even number**, and it rounds the divider **up**. The real SPI clock can therefore be lower than the value you request:
+
+| `core_freq` | Requested SPI clock | Divider | Real SPI clock |
+|---|---|---|---|
+| 400 MHz | 48 MHz | 10 | 40 MHz |
+| 400 MHz | 50 MHz | 8 | 50 MHz |
+| 500 MHz | 48 MHz | 12 | 41.7 MHz |
+| 500 MHz | 50 MHz | 10 | 50 MHz |
+
+For this reason the overlay above requests 50 MHz instead of 48 MHz: it divides evenly at both 400 MHz and 500 MHz.
+
+On some Raspberry Pi models the firmware changes `core_freq` together with CPU frequency scaling. When the system is idle the core clock drops, the SPI clock drops with it, and the UI stutters at the next touch. To prevent this, lock the core clock in the boot configuration:
+
+```ini
+# Append to config.txt
+core_freq=400
+core_freq_min=400
+```
+
+
+Where to put these lines:
+
+- **Yocto (recommended):** set `RPI_EXTRA_CONFIG` in `local.conf` or in a `.bbappend` so the setting is part of every image:
+
+  ```bitbake
+  RPI_EXTRA_CONFIG = "core_freq=400\ncore_freq_min=400\n"
+  ```
+
+- **Directly on the SD card:** edit `/boot/config.txt` in the boot partition.
+
+#### 3. Verify on the target
+
+```bash
+# Core clock in Hz (should stay constant)
+vcgencmd measure_clock core
+
+# Check the real SPI speed requested by the driver
+dmesg | grep -i -E "spi|ili9341|fb"
+```
+
+Watch the core clock while the system is idle and while the UI is busy. If the value changes, the lock is not applied.
+
+> **Note:** locking the core clock stops dynamic down-clocking, so the SPI clock stays at its target. It also raises idle power and heat slightly. This matters on a small board without a heatsink.
+
+
+### 7.7 First Boot Checklist
+
+Insert the SD card into the Raspberry Pi Zero 2 W, power it on, and connect through SSH (or attach a keyboard and monitor). Then run these checks.
+
+1. **Wi-Fi:**
+
+   ```bash
+   ping google.com
+   ```
+
+2. **Microservices:**
+
+   ```bash
+   systemctl status local-database daemon-uart mqtt-connect ui-qt
+   ```
+
+   All services should show `active (running)`. If one has failed, read its log:
+
+   ```bash
+   journalctl -u <service_name> -e
+   ```
+
+3. **MQTT connection:**
+
+   ```bash
+   journalctl -u mqtt-connect -f
+   ```
+
+   Look for the "Connected to broker" message.
+
+4. **UART link:** make sure the ESP32 Provisioner is wired to the Raspberry Pi UART pins and is powered on.
+
+   | Raspberry Pi | Physical pin | ESP32 Provisioner |
+   |---|---|---|
+   | TX (GPIO14) | Pin 8 | RX |
+   | RX (GPIO15) | Pin 10 | TX |
+   | GND | any GND pin | GND |
+
+   Cross the lines: Pi TX goes to ESP32 RX, and Pi RX goes to ESP32 TX. Connect the grounds as well.
+
+
+### 7.8 Fast Application Update (For Developers)
+
+If you change the C++ source in `apps/` and only want to update the binary, you do not need to rebuild the whole OS.
+
 ```bash
 bitbake -c cleansstate gateway-app && bitbake gateway-app
-# then copy the new binary to the target, or rebuild the image
 ```
+
+Then copy the new binary to the Raspberry Pi and restart the service:
+
+```bash
+scp build/tmp/work/<path-to-binary>/gateway-daemon root@<pi-ip>:/usr/bin/
+ssh root@<pi-ip> systemctl restart daemon-uart
+```
+
 
 ## 8. Firmware Guide (ESP32)
  
@@ -606,8 +838,7 @@ This is the "Network Co-Processor" (NCP) attached directly to the Raspberry Pi.
 These are the edge devices scattered around the house.
 *   **Sensors (Temp, Humidity, Lux, PIR):** They run a hardware timer (e.g., every 30 seconds) or hardware interrupts (PIR). They read data via I2C/ADC, format it, and **Publish** the data to a designated **Group Address** (configured by the Gateway).
 *   **Actuators (Relay, AC, Lights):** They **Subscribe** to the Gateway's commands and, more importantly, to the Sensor's Group Address.
-*   **Zero-Latency Edge Automation:** 
-    When an Actuator receives a `CMD_ACTUATOR_AUTO` command, its `is_auto` flag is set to `true`. From then on, if a Sensor publishes a temperature of 30°C to the Group Address, the Actuator receives it directly via the mesh. Its internal Vendor Model evaluates the `threshold_on` / `threshold_off` limits. If the condition is met, the Actuator toggles its GPIO **locally and instantly**, completely bypassing the Raspberry Pi and Wi-Fi network.
+*   **Zero-Latency Edge Automation:** When an Actuator receives a `CMD_ACTUATOR_AUTO` command, its `is_auto` flag is set to `true`. From then on, if a Sensor publishes a threshold-exceeding value to the Group Address, the Actuator toggles its GPIO **locally and instantly**, completely bypassing the Raspberry Pi and Wi-Fi network.
 
 #### C. Remote Provisioning Server (`firmware/esp32-mesh/rpr_server/`)
 *   Supports the PB-Remote bearer. It allows the main Provisioner to securely add devices that are physically located out of its direct Bluetooth radio range by routing the provisioning packets through intermediate nodes.
@@ -636,7 +867,6 @@ These are the edge devices scattered around the house.
 | SQLite documentation | https://www.sqlite.org/docs.html |
 | systemd manual | https://www.freedesktop.org/software/systemd/man/ |
  
-## License
+## 10. License
  
-MIT. See [`yocto/meta-ble-mesh/COPYING.MIT`](yocto/meta-ble-mesh/COPYING.MIT). `TODO: confirm for the whole repository.`
-
+MIT. See [`yocto/meta-ble-mesh/COPYING.MIT`](yocto/meta-ble-mesh/COPYING.MIT).
