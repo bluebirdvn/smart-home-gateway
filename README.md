@@ -505,7 +505,11 @@ dtoverlay=screen_overlayer
 - `wpa_supplicant@wlan0.service` manages the association.
 - MQTT over TLS needs correct **time** (certificate validity) and a CA bundle. If TLS fails right after boot, check the clock (`timedatectl`) and that NTP is reachable.
 ### 4.13 Concurrency patterns used in the daemon
- 
+
+> This section describes the **Linux daemon** (`std::thread`, `std::mutex`,
+> `std::condition_variable`). The ESP32 firmware uses FreeRTOS primitives
+> instead; see [8.5 FreeRTOS Design on the ESP32](#85-freertos-design-on-the-esp32).
+
 The daemon uses producer/consumer threads with queues:
  
 | Thread / loop | Role |
@@ -879,6 +883,105 @@ These edge devices interface directly with physical environments and appliances 
 4.  **Provision:** Click "Provision" on the UI. The Gateway orchestrates the key exchange. Once done, the UI will display the new device with its assigned Unicast Address and Model features.
 5.  **Configure:** Assign the node to a Group to begin Edge Automation.
 
+### 8.5 FreeRTOS Design on the ESP32
+
+The Provisioner runs on ESP-IDF's FreeRTOS. Its UART bridge (`ReliableTransport`
++ `ArqController` + `SerialPort`) is built from three tasks that talk to each
+other through FreeRTOS primitives. Each task has one job, so a slow BLE Mesh
+callback can never stall UART reception, and a transmit waiting for an ACK can
+never block receiving.
+
+#### Task overview
+
+| Task | Stack | Priority | Blocks on | Responsibility |
+|---|---|---|---|---|
+| `rx_task` | 4096 B | 1 | `uart_read_bytes` (100 ms timeout) | Read bytes, parse frames, send ACK, route frames |
+| `dispatch_task` | 4096 B | 1 | `xTaskNotifyWait` | Run the frame callback (UART frame to BLE Mesh) |
+| `tx_task` | 4096 B | 1 | `xTaskNotifyWait` | Drain the TX queue, send frames, wait for ACK (ARQ) |
+
+> In ESP-IDF the stack size passed to `xTaskCreate` is in **bytes**, not words
+> as in vanilla FreeRTOS.
+
+```mermaid
+flowchart LR
+    UART_IN[UART RX] --> rx_task
+    rx_task -- ACK/NACK --> ARQ[ArqController]
+    rx_task -- data frame --> DQ[dispatch queue + mutex]
+    DQ -- notify --> dispatch_task
+    dispatch_task --> CB[on_frame_cb: BLE Mesh]
+    MESH[Mesh events] -- enqueue_frame --> TQ[tx queue + mutex]
+    TQ -- notify --> tx_task
+    tx_task --> ARQ
+    ARQ --> UART_OUT[UART TX]
+    ARQ -. wait ACK .- rx_task
+```
+
+#### FreeRTOS primitives used
+
+| Primitive | Where | Why |
+|---|---|---|
+| `xTaskCreate` | `start()` | Create the three tasks. Every return value is checked |
+| **Task notification** (`xTaskNotifyGive`, `xTaskNotifyWait`) | `tx_task`, `dispatch_task` wake-up | One waiter, one signal: lighter and faster than a semaphore |
+| **Task notification** + `TaskHandle_t` | `ArqController` | `rx_task` must wake the exact task waiting for an ACK, so the waiter registers its handle (`xTaskGetCurrentTaskHandle`) |
+| **Mutex** (`xSemaphoreCreateMutex`) | `tx_mutex`, `dispatch_mutex`, `sem_ack` | Protect the shared `std::queue` objects and the ACK state |
+| **Event group** (`xEventGroupWaitBits`) | `stop()` | Each task sets its own `*_EXITED` bit before it deletes itself, so `stop()` waits until all tasks are really gone |
+| `vTaskDelay` | `dispatch_loop` | 2 s pause after `CMD_GROUP_ADD`, `CMD_GROUP_DELETE`, `CMD_MODEL_PUB_SET` |
+
+> Queues are `std::queue` guarded by a mutex rather than FreeRTOS queues,
+> because `RawFrame` holds a `std::vector`. A FreeRTOS queue copies raw bytes
+> and cannot safely copy such an object. The mutex protects the queue and the
+> notification only wakes the consumer.
+
+#### Receive path (Pi to Mesh)
+
+1. `rx_task` reads one byte at a time and feeds `FrameParser`.
+2. ACK or NACK frames go to `ArqController::notify_ack` / `notify_nack`.
+3. Data frames are acknowledged immediately (ACK written back to the Pi), pushed
+   into the dispatch queue with `std::move`, and `dispatch_task` is notified.
+4. `dispatch_task` drains the queue and calls `on_frame_cb`, which turns the
+   frame into a BLE Mesh send.
+
+#### Transmit path (Mesh to Pi) and ARQ
+
+1. `enqueue_frame()` pushes a frame into the TX queue and notifies `tx_task`.
+2. `tx_task` drains the queue. A reliable frame goes through
+   `ArqController::send_reliable`, which runs Stop-and-Wait ARQ:
+   register `waiting_task`, clear stale ACK state, write the frame, then block in
+   `xTaskNotifyWait` for the remaining time of `ARQ_TIMEOUT_MS`.
+3. Registering the waiting task **before** writing the frame ensures an ACK that
+   arrives immediately is not lost.
+4. The notification only wakes the waiter. Which sequence was acknowledged is
+   stored in `last_acked` / `last_nacked`, so unrelated wake-ups are ignored.
+5. After `ARQ_MAX_RETRY` failed attempts the frame is dropped and an error is
+   logged.
+
+#### Start and stop
+
+- `start()` clears the exit bits, creates the tasks, and records in
+  `expected_exit_bits` only the tasks that were created successfully. If any
+  creation fails it calls `stop()` to clean up and returns an error.
+- `stop()` clears `is_running`, wakes `tx_task` and `dispatch_task`, waits for
+  all exit bits (5 s timeout), and only then closes the UART.
+  `uart_read_bytes` uses a 100 ms timeout, so `rx_task` re-checks `is_running`
+  without needing the port closed first.
+- Do not call `stop()` from inside `on_frame_cb`: it runs in `dispatch_task` and
+  would wait for itself.
+
+#### Node firmware
+
+Sensor and actuator nodes use ESP-IDF peripheral APIs alongside the mesh stack:
+a FreeRTOS software timer (30 s) triggers AHT30/BH1750 sampling over I2C, the PIR
+sensor uses a GPIO interrupt, and the AC controller uses the RMT peripheral for
+IR transmission.
+
+#### Known limitations
+
+- The dispatch queue and TX queue are unbounded `std::queue`s. Under a burst of
+  traffic they grow until heap runs out.
+- A reliable frame that fails all retries is dropped without notifying the
+  caller of `enqueue_frame`.
+- Frames re-sent because an ACK was lost are not de-duplicated by `seq` on the
+  receiving side, so a non-idempotent command could run twice.
 
 ## 9. Further Reading
  
