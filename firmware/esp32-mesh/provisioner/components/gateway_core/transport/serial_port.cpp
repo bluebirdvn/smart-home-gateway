@@ -24,7 +24,7 @@ communication_status_t SerialPort::close() {
 }
 
 int SerialPort::read_byte(uint8_t& out) {
-    return ::uart_read_bytes(UART_PORT_NUM, &out, 1, portMAX_DELAY);
+    return ::uart_read_bytes(UART_PORT_NUM, &out, 1, pdMS_TO_TICKS(100));
 }
 
 int SerialPort::write_bytes(const std::vector<uint8_t>& data) {

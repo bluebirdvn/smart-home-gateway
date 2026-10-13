@@ -26,8 +26,10 @@ public:
     communication_status_t start();
     communication_status_t stop();
 
-    void enqueue_frame(const std::vector<uint8_t>& raw_frame, bool reliable = true);
-    void set_frame_callback(frame_cb_t cb) { on_frame_cb = std::move(cb); }
+    bool enqueue_frame(const std::vector<uint8_t>& raw_frame, bool reliable = true);
+    void set_frame_callback(frame_cb_t cb) { 
+        on_frame_cb = std::move(cb); 
+    }
 
 private:
     std::shared_ptr<ISerialPort> port;
@@ -44,7 +46,7 @@ private:
 
     std::queue<TxItem> tx_queue;
     SemaphoreHandle_t tx_mutex;
-    TaskHandle_t tx_task;
+    TaskHandle_t tx_task = nullptr;
 
     static void tx_task_func(void* arg);
     static void rx_task_func(void* arg);
@@ -55,7 +57,10 @@ private:
 
     std::queue<RawFrame>  dispatch_queue;
     SemaphoreHandle_t dispatch_mutex;
-    TaskHandle_t dispatch_task;
+    TaskHandle_t dispatch_task = nullptr;
+
+    EventGroupHandle_t exit_events = nullptr;
+    EventBits_t expected_exit_bits = 0;
 
     void rx_loop();
     void tx_loop();

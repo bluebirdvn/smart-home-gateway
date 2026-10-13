@@ -20,7 +20,6 @@ ArqController::~ArqController() {
 communication_status_t ArqController::send_reliable(const std::vector<uint8_t>& frame, uint8_t seq)
 {
     for (uint8_t attempt = 0; attempt < ARQ_MAX_RETRY; attempt++) {
-        port->write_bytes(frame);
 
         xSemaphoreTake(sem_ack, portMAX_DELAY);
 
@@ -30,6 +29,8 @@ communication_status_t ArqController::send_reliable(const std::vector<uint8_t>& 
         waiting_task = xTaskGetCurrentTaskHandle();
         xSemaphoreGive(sem_ack);
         xTaskNotifyStateClear(nullptr);
+        port->write_bytes(frame);
+
         bool got_ack = false;
         bool got_nack = false;
 
