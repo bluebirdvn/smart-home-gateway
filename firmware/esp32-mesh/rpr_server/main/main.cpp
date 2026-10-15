@@ -10,7 +10,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <inttypes.h>
-
+#include "esp_pm.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
 
@@ -423,6 +423,11 @@ static esp_err_t ble_mesh_init(void)
     return err;
 }
 
+extern "C" void vApplicationIdleHook()
+{
+
+}
+
 extern "C" void app_main(void)
 {
     esp_err_t err;
@@ -447,7 +452,17 @@ extern "C" void app_main(void)
     }
     ESP_ERROR_CHECK(err);
     ESP_LOGI(TAG, "BLE Mesh NVS partition initialized successfully");
+    esp_pm_config_t pm_config = {
+        .max_freq_mhz = 240,
+        .min_freq_mhz = 40,
+        .light_sleep_enable = true
+    };
 
+    ESP_ERROR_CHECK(esp_pm_configure(&pm_config));
+
+    ESP_LOGI(TAG, "Automatic Light Sleep enabled\n");
+
+    
 
     err = bluetooth_init();
     if (err) {
