@@ -80,7 +80,7 @@ This fluid performance is achieved by optimizing the SPI clock to 50MHz, locking
 | Deployment | Yocto image for Raspberry Pi with systemd services |
 
 ## 2. System Architecture
- 
+![Gateway](images/Gateway.jpg)
 ![System Architecture](images/system_architecture.png)
 
 ### System Architecture Overview
