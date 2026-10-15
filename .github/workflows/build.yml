@@ -41,9 +41,9 @@ jobs:
           - fw_path: "firmware/esp32-mesh/node_ble_mesh_actuator_ac_r"
             fw_target: "esp32"
           - fw_path: "firmware/esp32-mesh/provisioner"
-            fw_target: "esp32h2"  
+            fw_target: "esp32"  
           - fw_path: "firmware/esp32-mesh/rpr_server"
-            fw_target: "esp32c6" 
+            fw_target: "esp32" 
     steps:
     - name: checkout repo
       uses: actions/checkout@v4

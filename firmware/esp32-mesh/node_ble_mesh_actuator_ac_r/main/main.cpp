@@ -16,7 +16,7 @@
 #include "esp_ble_mesh_networking_api.h"
 #include "esp_ble_mesh_config_model_api.h"
 #include "esp_ble_mesh_local_data_operation_api.h"
-
+#include "esp_pm.h"
 #include "vendor_model.h"
 #include "actuator.hpp"
 #include "board.hpp"
@@ -409,6 +409,12 @@ static i2c_master_bus_handle_t i2c_bus_init(void) {
     return bus_handle;
 }
 
+extern "C" void vApplicationIdleHook(void)
+{
+}
+
+
+
 extern "C" void app_main(void) {
     ESP_LOGI(TAG, "starting boot system");
 
@@ -425,6 +431,16 @@ extern "C" void app_main(void) {
         err = nvs_flash_init_partition("ble_mesh");
     }
     ESP_ERROR_CHECK(err);
+
+        esp_pm_config_t pm_config = {
+        .max_freq_mhz = 240,
+        .min_freq_mhz = 40,
+        .light_sleep_enable = true
+    };
+
+    ESP_ERROR_CHECK(esp_pm_configure(&pm_config));
+
+    ESP_LOGI(TAG, "Automatic Light Sleep enabled\n");
 
     board_init();
     ESP_ERROR_CHECK(bluetooth_init());

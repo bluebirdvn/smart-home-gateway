@@ -17,6 +17,7 @@
 #include "esp_ble_mesh_config_model_api.h"
 #include "esp_ble_mesh_generic_model_api.h"
 
+#include "esp_pm.h"
 #include "provisioner.hpp"
 #include "config.h"
 #include "mesh_sender.hpp"
@@ -172,6 +173,11 @@ static void on_gateway_frame(const RawFrame& raw) {
     g_dispatcher->dispatch(mf);
 }
 
+extern "C" void vApplicationIdleHook(void)
+{
+    // ESP_LOGI(TAG, "idle");
+}
+
 extern "C" void app_main(void) {
     esp_err_t err = nvs_flash_init();
     if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -192,6 +198,16 @@ extern "C" void app_main(void) {
 
     bluetooth_init();
     get_dev_uuid(dev_uuid);
+
+    esp_pm_config_t pm_config = {
+        .max_freq_mhz = 240,
+        .min_freq_mhz = 40,
+        .light_sleep_enable = true
+    };
+
+    ESP_ERROR_CHECK(esp_pm_configure(&pm_config));
+
+    ESP_LOGI(TAG, "Automatic Light Sleep enabled\n");
 
     const uart_config_t uart_config = {
         .baud_rate = UART_BAUD_RATE,
